@@ -19,6 +19,8 @@
 #include "pqueue.h"
 #include "pipe.h"
 
+#define MEDUSA_DEBUG_NAME "monitor"
+#include "debug.h"
 #include "error.h"
 #include "clock.h"
 #include "io.h"
@@ -902,20 +904,16 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_add_unlocked (struct
 {
         int rc;
         if (MEDUSA_IS_ERR_OR_NULL(monitor)) {
-                fprintf(stderr, "here %s %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
                 return -EINVAL;
         }
         if (MEDUSA_IS_ERR_OR_NULL(subject)) {
-                fprintf(stderr, "here %s %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
                 return -EINVAL;
         }
         if (!MEDUSA_IS_ERR_OR_NULL(subject->monitor)) {
-                fprintf(stderr, "here %s %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
                 return -EALREADY;
         }
         if (medusa_subject_get_type(subject) == MEDUSA_SUBJECT_TYPE_SIGNAL) {
                 if (MEDUSA_IS_ERR_OR_NULL(monitor->signal.backend)) {
-                        fprintf(stderr, "here %s %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
                         return -ENOENT;
                 }
         }
@@ -924,7 +922,6 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_add_unlocked (struct
         subject->flags |= MEDUSA_SUBJECT_FLAG_MOD;
         rc = monitor_signal(monitor, WAKEUP_REASON_SUBJECT_ADD);
         if (rc < 0) {
-                fprintf(stderr, "here %s %s:%d\n", __FUNCTION__, __FILE__, __LINE__);
                 return rc;
         }
         return 0;
@@ -1140,6 +1137,7 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
         }
         monitor = (struct medusa_monitor *) malloc(sizeof(struct medusa_monitor));
         if (monitor == NULL) {
+                medusa_errorf("can not allocate memory");
                 goto bail;
         }
         memset(monitor, 0, sizeof(struct medusa_monitor));
@@ -1222,9 +1220,11 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                 monitor->poll.backend = medusa_monitor_select_create(&select_init_options);
         } else {
 #endif
+                medusa_errorf("invalid poll type: %d", options->poll.type);
                 goto bail;
         }
         if (monitor->poll.backend == NULL) {
+                medusa_errorf("can not create poll backend");
                 goto bail;
         }
         monitor->poll.backend->monitor = monitor;
@@ -1252,6 +1252,7 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                 monitor->timer.backend = medusa_timer_monotonic_create(NULL);
 #endif
         } else {
+                medusa_errorf("invalid timer type: %d", options->timer.type);
                 goto bail;
         }
         if (monitor->timer.backend == NULL) {
@@ -1260,6 +1261,7 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
         monitor->timer.backend->monitor = monitor;
         monitor->timer.pqueue = medusa_pqueue_create(0, 64, monitor_timer_subject_compare, monitor_timer_subject_set_position, monitor_timer_subject_get_position);
         if (monitor->timer.pqueue == NULL) {
+                medusa_errorf("can not create timer pqueue");
                 goto bail;
         }
         if (options->signal.type == MEDUSA_MONITOR_SIGNAL_DEFAULT) {
@@ -1291,37 +1293,45 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
         if (MEDUSA_IS_ERR_OR_NULL(monitor->signal.backend)) {
                 if (!MEDUSA_IS_ERR(monitor->signal.backend) ||
                     (MEDUSA_PTR_ERR(monitor->signal.backend) != -EALREADY)) {
+                        medusa_errorf("can not create signal backend");
                         goto bail;
                 }
         }
         TAILQ_INIT(&monitor->condition.signalled);
         rc = medusa_pipe2(monitor->wakeup.fds, MEDUSA_PIPE_FLAG_NONBLOCK);
         if (rc != 0) {
+                medusa_errorf("can not create wakeup fds");
                 goto bail;
         }
         monitor->wakeup.io = medusa_io_create(monitor, monitor->wakeup.fds[0], monitor_wakeup_io_onevent, monitor);
         if (MEDUSA_IS_ERR_OR_NULL(monitor->wakeup.io)) {
+                medusa_errorf("can not create wakeup io");
                 goto bail;
         }
         rc = medusa_io_set_events(monitor->wakeup.io, MEDUSA_IO_EVENT_IN);
         if (rc < 0) {
+                medusa_errorf("can not setup wakeup io");
                 goto bail;
         }
         rc = medusa_io_set_enabled(monitor->wakeup.io, 1);
         if (rc < 0) {
+                medusa_errorf("can not enable wakeup io");
                 goto bail;
         }
         if (monitor->timer.backend->fd != NULL) {
                 monitor->timer.io = medusa_io_create(monitor, monitor->timer.backend->fd(monitor->timer.backend), monitor_timer_io_onevent, monitor);
                 if (MEDUSA_IS_ERR_OR_NULL(monitor->timer.io)) {
+                        medusa_errorf("can not create timer io");
                         goto bail;
                 }
                 rc = medusa_io_set_events(monitor->timer.io, MEDUSA_IO_EVENT_IN);
                 if (rc < 0) {
+                        medusa_errorf("can not setup timer io");
                         goto bail;
                 }
                 rc = medusa_io_set_enabled(monitor->timer.io, 1);
                 if (rc < 0) {
+                        medusa_errorf("can not enable timer io");
                         goto bail;
                 }
         }
@@ -1330,14 +1340,17 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                 if (monitor->signal.backend->fd != NULL) {
                         monitor->signal.io = medusa_io_create(monitor, monitor->signal.backend->fd(monitor->signal.backend), monitor_signal_io_onevent, monitor);
                         if (MEDUSA_IS_ERR_OR_NULL(monitor->signal.io)) {
+                                medusa_errorf("can not create signal io");
                                 goto bail;
                         }
                         rc = medusa_io_set_events(monitor->signal.io, MEDUSA_IO_EVENT_IN);
                         if (rc < 0) {
+                                medusa_errorf("can not setup signal io");
                                 goto bail;
                         }
                         rc = medusa_io_set_enabled(monitor->signal.io, 1);
                         if (rc < 0) {
+                                medusa_errorf("can not enable signal io");
                                 goto bail;
                         }
                 }
