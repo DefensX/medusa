@@ -178,6 +178,8 @@ dist.dir = ../dist
 dist.base = medusa
 
 dist.include-y = \
+	monitor-private.h \
+	subject-struct.h \
 	monitor.h \
 	clock.h \
 	debug.h \

@@ -55,6 +55,7 @@ enum {
 
 TAILQ_HEAD(medusa_subjects, medusa_subject);
 struct medusa_subject {
+        TAILQ_ENTRY(medusa_subject) hook;
         TAILQ_ENTRY(medusa_subject) list;
         unsigned int flags;
         struct medusa_monitor *monitor;
