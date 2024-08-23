@@ -2967,6 +2967,7 @@ unsigned int medusa_dnsrequest_record_type_value (const char *type)
         if (strcasecmp(type, "AAAA") == 0)      return MEDUSA_DNSREQUEST_RECORD_TYPE_AAAA;
         if (strcasecmp(type, "SRV") == 0)       return MEDUSA_DNSREQUEST_RECORD_TYPE_SRV;
         if (strcasecmp(type, "NAPTR") == 0)     return MEDUSA_DNSREQUEST_RECORD_TYPE_NAPTR;
+        if (strcasecmp(type, "HTTPS") == 0)     return MEDUSA_DNSREQUEST_RECORD_TYPE_HTTPS;
         if (strcasecmp(type, "ANY") == 0)       return MEDUSA_DNSREQUEST_RECORD_TYPE_ANY;
         if (strcasecmp(type, "UNKNOWN") == 0)   return MEDUSA_DNSREQUEST_RECORD_TYPE_UNKNOWN;
         return MEDUSA_DNSREQUEST_RECORD_TYPE_UNKNOWN;
@@ -2985,6 +2986,7 @@ const char * medusa_dnsrequest_record_type_string (unsigned int type)
                 case MEDUSA_DNSREQUEST_RECORD_TYPE_AAAA:        return "MEDUSA_DNSREQUEST_RECORD_TYPE_AAAA";
                 case MEDUSA_DNSREQUEST_RECORD_TYPE_SRV:         return "MEDUSA_DNSREQUEST_RECORD_TYPE_SRV";
                 case MEDUSA_DNSREQUEST_RECORD_TYPE_NAPTR:       return "MEDUSA_DNSREQUEST_RECORD_TYPE_NAPTR";
+                case MEDUSA_DNSREQUEST_RECORD_TYPE_HTTPS:       return "MEDUSA_DNSREQUEST_RECORD_TYPE_HTTPS";
                 case MEDUSA_DNSREQUEST_RECORD_TYPE_ANY:         return "MEDUSA_DNSREQUEST_RECORD_TYPE_ANY";
                 case MEDUSA_DNSREQUEST_RECORD_TYPE_UNKNOWN:     return "MEDUSA_DNSREQUEST_RECORD_TYPE_UNKNOWN";
                 default:
