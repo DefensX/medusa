@@ -2410,7 +2410,7 @@ bind_ipv6:
                     options->clodestroy == 1) {
                         tcpsocket_closesocket(fd);
                 }
-                medusa_errorf("can not connect to any resolved address");
+                medusa_errorf("can not connect to any resolved address, rc: %d, %s", rc, strerror(rc));
                 goto bail;
         }
         connected = (rc == 0);
