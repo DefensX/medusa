@@ -117,6 +117,8 @@ install: src test
 	install -m 0644 dist/include/medusa/websocketclient.h ${DESTDIR}/${prefix}/include/medusa/websocketclient.h
 	install -m 0644 dist/include/medusa/websocketserver.h ${DESTDIR}/${prefix}/include/medusa/websocketserver.h
 	install -m 0644 dist/include/medusa/url.h ${DESTDIR}/${prefix}/include/medusa/url.h
+	install -m 0644 dist/include/medusa/monitor-private.h ${DESTDIR}/${prefix}/include/medusa/monitor-private.h
+	install -m 0644 dist/include/medusa/subject-struct.h ${DESTDIR}/${prefix}/include/medusa/subject-struct.h
 
 ifeq (${MEDUSA_LIBMEDUSA_TARGET_SO}, y)
 	install -d ${DESTDIR}/${prefix}/lib
