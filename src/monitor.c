@@ -133,6 +133,10 @@ static const struct medusa_monitor_init_options g_init_options = {
                 .type   = MEDUSA_MONITOR_SIGNAL_DEFAULT,
                 .u      = { }
         },
+        .onevent = {
+                .callback       = NULL,
+                .context        = NULL
+        }
 };
 
 static int monitor_wakeup_io_onevent (struct medusa_io *io, unsigned int events, void *context, void *param)
