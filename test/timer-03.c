@@ -89,7 +89,7 @@ static int test_poll (unsigned int poll)
                 fprintf(stderr, "medusa_timer_set_singleshot failed\n");
                 goto bail;
         }
-        rc = medusa_timer_set_resolution(timer, MEDUSA_TIMER_RESOLUTION_NANOSECOMDS);
+        rc = medusa_timer_set_resolution(timer, MEDUSA_TIMER_RESOLUTION_NANOSECONDS);
         if (rc < 0) {
                 fprintf(stderr, "medusa_timer_set_resolution failed\n");
                 goto bail;

@@ -75,7 +75,7 @@ static int test_poll (unsigned int poll)
         if (rc < 0) {
                 goto bail;
         }
-        rc = medusa_timer_set_resolution(timer, MEDUSA_TIMER_RESOLUTION_NANOSECOMDS);
+        rc = medusa_timer_set_resolution(timer, MEDUSA_TIMER_RESOLUTION_NANOSECONDS);
         if (rc < 0) {
                 goto bail;
         }

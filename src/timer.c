@@ -132,7 +132,7 @@ static int timer_set_resolution (struct medusa_timer *timer, unsigned int resolu
         timer->flags &= ~MEDUSA_TIMER_FLAG_MICROSECONDS;
         timer->flags &= ~MEDUSA_TIMER_FLAG_MILLISECONDS;
         timer->flags &= ~MEDUSA_TIMER_FLAG_SECONDS;
-        if (resolution == MEDUSA_TIMER_RESOLUTION_NANOSECOMDS) {
+        if (resolution == MEDUSA_TIMER_RESOLUTION_NANOSECONDS) {
                 timer->flags |= MEDUSA_TIMER_FLAG_NANOSECONDS;
         } else if (resolution == MEDUSA_TIMER_RESOLUTION_MICROSECONDS) {
                 timer->flags |= MEDUSA_TIMER_FLAG_MICROSECONDS;
@@ -807,7 +807,7 @@ __attribute__ ((visibility ("default"))) unsigned int medusa_timer_get_accuracy_
                 return -EINVAL;
         }
         if (timer->flags & MEDUSA_TIMER_FLAG_NANOSECONDS) {
-                return MEDUSA_TIMER_RESOLUTION_NANOSECOMDS;
+                return MEDUSA_TIMER_RESOLUTION_NANOSECONDS;
         } else if (timer->flags & MEDUSA_TIMER_FLAG_MICROSECONDS) {
                 return MEDUSA_TIMER_RESOLUTION_MICROSECONDS;
         } else if (timer->flags & MEDUSA_TIMER_FLAG_MILLISECONDS) {
@@ -861,7 +861,7 @@ __attribute__ ((visibility ("default"))) unsigned int medusa_timer_get_resolutio
                 return -EINVAL;
         }
         if (timer->flags & MEDUSA_TIMER_FLAG_NANOSECONDS) {
-                return MEDUSA_TIMER_RESOLUTION_NANOSECOMDS;
+                return MEDUSA_TIMER_RESOLUTION_NANOSECONDS;
         } else if (timer->flags & MEDUSA_TIMER_FLAG_MICROSECONDS) {
                 return MEDUSA_TIMER_RESOLUTION_MICROSECONDS;
         } else if (timer->flags & MEDUSA_TIMER_FLAG_MILLISECONDS) {
@@ -1026,7 +1026,7 @@ __attribute__ ((visibility ("default"))) int medusa_timer_update_timespec_unlock
                 return -EIO;
         }
         resolution = medusa_timer_get_resolution_unlocked(timer);
-        if (resolution == MEDUSA_TIMER_RESOLUTION_NANOSECOMDS) {
+        if (resolution == MEDUSA_TIMER_RESOLUTION_NANOSECONDS) {
         } else if (resolution == MEDUSA_TIMER_RESOLUTION_MICROSECONDS) {
                 timer->_timespec.tv_nsec += 500;
                 timer->_timespec.tv_nsec /= 1e3;
