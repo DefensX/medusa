@@ -14,6 +14,7 @@ int medusa_httpserver_get_state_unlocked (const struct medusa_httpserver *httpse
 int medusa_httpserver_get_error_unlocked (const struct medusa_httpserver *httpserver);
 
 int medusa_httpserver_get_protocol_unlocked (struct medusa_httpserver *httpserver);
+int medusa_httpserver_get_sockport_unlocked (const struct medusa_httpserver *httpserver);
 int medusa_httpserver_get_sockname_unlocked (const struct medusa_httpserver *httpserver, struct sockaddr_storage *sockaddr);
 
 int medusa_httpserver_set_enabled_unlocked (struct medusa_httpserver *httpserver, int enabled);
@@ -66,16 +67,25 @@ unsigned int medusa_httpserver_client_get_state_unlocked (const struct medusa_ht
 int medusa_httpserver_client_set_enabled_unlocked (struct medusa_httpserver_client *httpserver_client, int enabled);
 int medusa_httpserver_client_get_enabled_unlocked (const struct medusa_httpserver_client *httpserver_client);
 
+int medusa_httpserver_client_set_read_timeout_unlocked (struct medusa_httpserver_client *httpserver_client, double timeout);
+double medusa_httpserver_client_get_read_timeout_unlocked (const struct medusa_httpserver_client *httpserver_client);
+
+int medusa_httpserver_client_set_write_timeout_unlocked (struct medusa_httpserver_client *httpserver_client, double timeout);
+double medusa_httpserver_client_get_write_timeout_unlocked (const struct medusa_httpserver_client *httpserver_client);
+
 int medusa_httpserver_client_reply_send_start_unlocked (struct medusa_httpserver_client *httpserver_client);
-int medusa_httpserver_client_reply_send_status_unlocked (struct medusa_httpserver_client *httpserver_client, const char *version, int code, const char *reason, ...) __attribute__((format(printf, 4, 5)));
-int medusa_httpserver_client_reply_send_vstatus_unlocked (struct medusa_httpserver_client *httpserver_client, const char *version, int code, const char *reason, va_list va);
-int medusa_httpserver_client_reply_send_header_unlocked (struct medusa_httpserver_client *httpserver_client, const char *key, const char *value, ...) __attribute__((format(printf, 3, 4)));
-int medusa_httpserver_client_reply_send_vheader_unlocked (struct medusa_httpserver_client *httpserver_client, const char *key, const char *value, va_list va);
+int medusa_httpserver_client_reply_send_status_unlocked (struct medusa_httpserver_client *httpserver_client, const char *version, int code, const char *reason);
+int medusa_httpserver_client_reply_send_statusf_unlocked (struct medusa_httpserver_client *httpserver_client, const char *version, int code, const char *reason, ...) __attribute__((format(printf, 4, 5)));
+int medusa_httpserver_client_reply_send_statusv_unlocked (struct medusa_httpserver_client *httpserver_client, const char *version, int code, const char *reason, va_list va);
+int medusa_httpserver_client_reply_send_header_unlocked (struct medusa_httpserver_client *httpserver_client, const char *key, const char *value);
+int medusa_httpserver_client_reply_send_headerf_unlocked (struct medusa_httpserver_client *httpserver_client, const char *key, const char *value, ...) __attribute__((format(printf, 3, 4)));
+int medusa_httpserver_client_reply_send_headerv_unlocked (struct medusa_httpserver_client *httpserver_client, const char *key, const char *value, va_list va);
 int medusa_httpserver_client_reply_send_body_unlocked (struct medusa_httpserver_client *httpserver_client, const void *body, int length);
 int medusa_httpserver_client_reply_send_bodyf_unlocked (struct medusa_httpserver_client *httpserver_client, const char *body, ...) __attribute__((format(printf, 2, 3)));
-int medusa_httpserver_client_reply_send_vbody_unlocked (struct medusa_httpserver_client *httpserver_client, const char *body, va_list va);
+int medusa_httpserver_client_reply_send_bodyv_unlocked (struct medusa_httpserver_client *httpserver_client, const char *body, va_list va);
 int medusa_httpserver_client_reply_send_finish_unlocked (struct medusa_httpserver_client *httpserver_client);
 
+int medusa_httpserver_client_get_fd_unlocked (struct medusa_httpserver_client *httpserver_client);
 int medusa_httpserver_client_get_sockname_unlocked (struct medusa_httpserver_client *httpserver_client, struct sockaddr_storage *sockaddr);
 int medusa_httpserver_client_get_peername_unlocked (struct medusa_httpserver_client *httpserver_client, struct sockaddr_storage *sockaddr);
 

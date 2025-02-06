@@ -6,6 +6,9 @@
 #include <poll.h>
 #include <errno.h>
 
+#define MEDUSA_DEBUG_NAME       "poll-poll"
+
+#include "debug.h"
 #include "queue.h"
 #include "subject-struct.h"
 #include "io.h"
@@ -218,6 +221,7 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
                 io = internal->ios[internal->pfds[i].fd];
                 rc = internal->onevent(backend, io, events, internal->context, NULL);
                 if (rc < 0) {
+                        medusa_errorf("internal->onevent failed, rc: %d", rc);
                         goto bail;
                 }
         }

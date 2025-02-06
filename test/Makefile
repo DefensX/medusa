@@ -36,6 +36,11 @@ define test-defaults
 	$1_ldflags-$(__LINUX__) += \
 		-lrt
 
+	$1_ldflags-${__WINDOWS__} += \
+		-lws2_32 \
+		-lcrypt32 \
+		-static
+
 	$1_depends-y = \
 		../dist/lib/libmedusa.a
 endef

@@ -33,6 +33,7 @@ libmedusa.a_cflags-y = \
 
 libmedusa.a_files-y = \
 	strndup.c \
+	debug.c \
 	pipe.c \
 	clock.c \
 	base64.c \
@@ -46,6 +47,7 @@ libmedusa.a_files-y = \
 	io.c \
 	signal.c \
 	timer.c \
+	url.c \
 	monitor.c \
 	version.c
 
@@ -120,30 +122,30 @@ libmedusa.a_files-y += \
 	../3rdparty/SPCDNS/src/mappings.c \
 	../3rdparty/SPCDNS/src/output.c
 
-ifneq ($(__DARWIN__), y)
+libmedusa.a_../3rdparty/SPCDNS/src/codec.c_cflags-y += \
+	-DNDEBUG
 
-libmedusa.a_../3rdparty/SPCDNS/src/codec.c_cflags-y = \
-	-DNDEBUG \
-	-Wno-error=unused-but-set-variable \
-	-Wno-unused-but-set-variable
+libmedusa.o_../3rdparty/SPCDNS/src/codec.c_cflags-y += \
+	-DNDEBUG
 
-libmedusa.o_../3rdparty/SPCDNS/src/codec.c_cflags-y = \
-	-DNDEBUG \
-	-Wno-error=unused-but-set-variable \
-	-Wno-unused-but-set-variable
+libmedusa.so.${MEDUSA_SONAME}_../3rdparty/SPCDNS/src/codec.c_cflags-y += \
+	-DNDEBUG
 
-libmedusa.so.${MEDUSA_SONAME}_../3rdparty/SPCDNS/src/codec.c_cflags-y = \
-	-DNDEBUG \
-	-Wno-error=unused-but-set-variable \
-	-Wno-unused-but-set-variable
+libmedusa.a_tcpsocket.c_cflags-$(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) += \
+	-Wno-deprecated-declarations
 
-endif
+libmedusa.o_tcpsocket.c_cflags-$(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) += \
+	-Wno-deprecated-declarations
+
+libmedusa.so.${MEDUSA_SONAME}_tcpsocket.c_cflags-$(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) += \
+	-Wno-deprecated-declarations
 
 libmedusa.a_files-y += \
 	httpserver.c \
 	../3rdparty/http-parser/http_parser.c
 
 libmedusa.a_files-y += \
+	websocketclient.c \
 	websocketserver.c \
 	../3rdparty/http-parser/http_parser.c
 
@@ -182,8 +184,11 @@ dist.dir = ../dist
 dist.base = medusa
 
 dist.include-y = \
+	monitor-private.h \
+	subject-struct.h \
 	monitor.h \
 	clock.h \
+	debug.h \
 	error.h \
 	pool.h \
 	iovec.h \
@@ -198,10 +203,12 @@ dist.include-y = \
 	httpserver.h \
 	dnsrequest.h \
 	dnsresolver.h \
+	websocketclient.h \
 	websocketserver.h \
 	exec.h \
 	queue.h \
 	queue_sys.h \
+	url.h \
 	sha1.h \
 	base64.h \
 	strndup.h \

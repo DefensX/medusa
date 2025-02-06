@@ -6,16 +6,25 @@
 #define MEDUSA_TIMER_INTERVAL_ASAP      1e-9
 
 enum {
-        MEDUSA_TIMER_RESOLUTION_NANOSECOMDS     = 1,
+        MEDUSA_TIMER_ACCURACY_TICK              = 1,
+        MEDUSA_TIMER_ACCURACY_INCREMENTAL       = 2,
+        MEDUSA_TIMER_ACCURACY_DEFAULT           = MEDUSA_TIMER_ACCURACY_INCREMENTAL
+#define MEDUSA_TIMER_ACCURACY_TICK              MEDUSA_TIMER_ACCURACY_TICK
+#define MEDUSA_TIMER_ACCURACY_INCREMENTAL       MEDUSA_TIMER_ACCURACY_INCREMENTAL
+#define MEDUSA_TIMER_ACCURACY_DEFAULT           MEDUSA_TIMER_ACCURACY_DEFAULT
+};
+
+enum {
+        MEDUSA_TIMER_RESOLUTION_NANOSECONDS     = 1,
         MEDUSA_TIMER_RESOLUTION_MICROSECONDS    = 2,
         MEDUSA_TIMER_RESOLUTION_MILLISECONDS    = 3,
         MEDUSA_TIMER_RESOLUTION_SECONDS         = 4,
         MEDUSA_TIMER_RESOLUTION_DEFAULT         = MEDUSA_TIMER_RESOLUTION_MILLISECONDS
-#define MEDUSA_TIMER_RESOLUTION_DEFAULT         MEDUSA_TIMER_RESOLUTION_DEFAULT
-#define MEDUSA_TIMER_RESOLUTION_NANOSECOMDS     MEDUSA_TIMER_RESOLUTION_NANOSECOMDS
+#define MEDUSA_TIMER_RESOLUTION_NANOSECONDS     MEDUSA_TIMER_RESOLUTION_NANOSECONDS
 #define MEDUSA_TIMER_RESOLUTION_MICROSECONDS    MEDUSA_TIMER_RESOLUTION_MICROSECONDS
 #define MEDUSA_TIMER_RESOLUTION_MILLISECONDS    MEDUSA_TIMER_RESOLUTION_MILLISECONDS
 #define MEDUSA_TIMER_RESOLUTION_SECONDS         MEDUSA_TIMER_RESOLUTION_SECONDS
+#define MEDUSA_TIMER_RESOLUTION_DEFAULT         MEDUSA_TIMER_RESOLUTION_DEFAULT
 };
 
 enum {
@@ -37,6 +46,7 @@ struct medusa_timer_init_options {
         double initial;
         double interval;
         int singleshot;
+        unsigned int accuracy;
         unsigned int resolution;
         int enabled;
 };
@@ -48,9 +58,9 @@ extern "C"
 
 int medusa_timer_init_options_default (struct medusa_timer_init_options *options);
 
-int medusa_timer_create_singleshot (struct medusa_monitor *monitor, double interval, int (*onevent) (struct medusa_timer *timer, unsigned int events, void *context, void *param), void *context);
-int medusa_timer_create_singleshot_timeval (struct medusa_monitor *monitor, const struct timeval *interval, int (*onevent) (struct medusa_timer *timer, unsigned int events, void *context, void *param), void *context);
-int medusa_timer_create_singleshot_timespec (struct medusa_monitor *monitor, const struct timespec *interval, int (*onevent) (struct medusa_timer *timer, unsigned int events, void *context, void *param), void *context);
+struct medusa_timer * medusa_timer_create_singleshot (struct medusa_monitor *monitor, double interval, int (*onevent) (struct medusa_timer *timer, unsigned int events, void *context, void *param), void *context);
+struct medusa_timer * medusa_timer_create_singleshot_timeval (struct medusa_monitor *monitor, const struct timeval *interval, int (*onevent) (struct medusa_timer *timer, unsigned int events, void *context, void *param), void *context);
+struct medusa_timer * medusa_timer_create_singleshot_timespec (struct medusa_monitor *monitor, const struct timespec *interval, int (*onevent) (struct medusa_timer *timer, unsigned int events, void *context, void *param), void *context);
 
 struct medusa_timer * medusa_timer_create (struct medusa_monitor *monitor, int (*onevent) (struct medusa_timer *timer, unsigned int events, void *context, void *param), void *context);
 struct medusa_timer * medusa_timer_create_with_options (const struct medusa_timer_init_options *options);
@@ -73,6 +83,9 @@ int medusa_timer_get_remaining_timespec (const struct medusa_timer *timer, struc
 int medusa_timer_set_singleshot (struct medusa_timer *timer, int singleshot);
 int medusa_timer_get_singleshot (const struct medusa_timer *timer);
 
+int medusa_timer_set_accuracy (struct medusa_timer *timer, unsigned int accuracy);
+unsigned int medusa_timer_get_accuracy (const struct medusa_timer *timer);
+
 int medusa_timer_set_resolution (struct medusa_timer *timer, unsigned int resolution);
 unsigned int medusa_timer_get_resolution (const struct medusa_timer *timer);
 
@@ -82,6 +95,7 @@ int medusa_timer_get_enabled (const struct medusa_timer *timer);
 int medusa_timer_enable (struct medusa_timer *timer);
 int medusa_timer_disable (struct medusa_timer *timer);
 
+int medusa_timer_restart (struct medusa_timer *timer);
 int medusa_timer_start (struct medusa_timer *timer);
 int medusa_timer_stop (struct medusa_timer *timer);
 

@@ -55,8 +55,14 @@ double medusa_tcpsocket_get_connect_timeout_unlocked (const struct medusa_tcpsoc
 int medusa_tcpsocket_set_read_timeout_unlocked (struct medusa_tcpsocket *tcpsocket, double timeout);
 double medusa_tcpsocket_get_read_timeout_unlocked (const struct medusa_tcpsocket *tcpsocket);
 
+int medusa_tcpsocket_set_write_timeout_unlocked (struct medusa_tcpsocket *tcpsocket, double timeout);
+double medusa_tcpsocket_get_write_timeout_unlocked (const struct medusa_tcpsocket *tcpsocket);
+
 int medusa_tcpsocket_set_ssl_unlocked (struct medusa_tcpsocket *tcpsocket, int enable);
 int medusa_tcpsocket_get_ssl_unlocked (const struct medusa_tcpsocket *tcpsocket);
+
+int medusa_tcpsocket_set_ssl_verify_unlocked (struct medusa_tcpsocket *tcpsocket, int enable);
+int medusa_tcpsocket_get_ssl_verify_unlocked (const struct medusa_tcpsocket *tcpsocket);
 
 int medusa_tcpsocket_set_ssl_certificate_unlocked (struct medusa_tcpsocket *tcpsocket, const char *certificate, int length);
 int medusa_tcpsocket_set_ssl_certificate_file_unlocked (struct medusa_tcpsocket *tcpsocket, const char *certificate);
@@ -65,6 +71,10 @@ const char * medusa_tcpsocket_get_ssl_certificate_unlocked (const struct medusa_
 int medusa_tcpsocket_set_ssl_privatekey_unlocked (struct medusa_tcpsocket *tcpsocket, const char *privatekey, int length);
 int medusa_tcpsocket_set_ssl_privatekey_file_unlocked (struct medusa_tcpsocket *tcpsocket, const char *privatekey);
 const char * medusa_tcpsocket_get_ssl_privatekey_unlocked (const struct medusa_tcpsocket *tcpsocket);
+
+int medusa_tcpsocket_set_ssl_ca_certificate_unlocked (struct medusa_tcpsocket *tcpsocket, const char *ca_certificate, int length);
+int medusa_tcpsocket_set_ssl_ca_certificate_file_unlocked (struct medusa_tcpsocket *tcpsocket, const char *ca_certificate);
+const char * medusa_tcpsocket_get_ssl_ca_certificate_unlocked (const struct medusa_tcpsocket *tcpsocket);
 
 int medusa_tcpsocket_ssl_set_SSL_unlocked (struct medusa_tcpsocket *tcpsocket, struct ssl_st *ssl);
 struct ssl_st * medusa_tcpsocket_ssl_get_SSL_unlocked (const struct medusa_tcpsocket *tcpsocket);
@@ -82,6 +92,7 @@ int medusa_tcpsocket_del_events_unlocked (struct medusa_tcpsocket *tcpsocket, un
 unsigned int medusa_tcpsocket_get_events_unlocked (const struct medusa_tcpsocket *tcpsocket);
 
 int medusa_tcpsocket_get_protocol_unlocked (struct medusa_tcpsocket *tcpsocket);
+int medusa_tcpsocket_get_sockport_unlocked (struct medusa_tcpsocket *tcpsocket);
 int medusa_tcpsocket_get_sockname_unlocked (struct medusa_tcpsocket *tcpsocket, struct sockaddr_storage *sockaddr);
 int medusa_tcpsocket_get_peername_unlocked (struct medusa_tcpsocket *tcpsocket, struct sockaddr_storage *sockaddr);
 

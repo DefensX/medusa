@@ -46,6 +46,7 @@ int medusa_udpsocket_add_events_unlocked (struct medusa_udpsocket *udpsocket, un
 unsigned int medusa_udpsocket_get_events_unlocked (const struct medusa_udpsocket *udpsocket);
 
 int medusa_udpsocket_get_protocol_unlocked (struct medusa_udpsocket *udpsocket);
+int medusa_udpsocket_get_sockport_unlocked (struct medusa_udpsocket *udpsocket);
 int medusa_udpsocket_get_sockname_unlocked (struct medusa_udpsocket *udpsocket, struct sockaddr_storage *sockaddr);
 int medusa_udpsocket_get_peername_unlocked (struct medusa_udpsocket *udpsocket, struct sockaddr_storage *sockaddr);
 

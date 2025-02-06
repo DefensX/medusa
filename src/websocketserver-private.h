@@ -10,7 +10,12 @@ struct medusa_websocketserver * medusa_websocketserver_create_with_options_unloc
 
 void medusa_websocketserver_destroy_unlocked (struct medusa_websocketserver *websocketserver);
 
-unsigned int medusa_websocketserver_get_state_unlocked (const struct medusa_websocketserver *websocketserver);
+int medusa_websocketserver_get_state_unlocked (const struct medusa_websocketserver *websocketserver);
+int medusa_websocketserver_get_error_unlocked (const struct medusa_websocketserver *websocketserver);
+
+int medusa_websocketserver_get_protocol_unlocked (struct medusa_websocketserver *websocketserver);
+int medusa_websocketserver_get_sockport_unlocked (const struct medusa_websocketserver *websocketserver);
+int medusa_websocketserver_get_sockname_unlocked (const struct medusa_websocketserver *websocketserver, struct sockaddr_storage *sockaddr);
 
 int medusa_websocketserver_set_enabled_unlocked (struct medusa_websocketserver *websocketserver, int enabled);
 int medusa_websocketserver_get_enabled_unlocked (const struct medusa_websocketserver *websocketserver);

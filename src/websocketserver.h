@@ -116,6 +116,8 @@ struct medusa_websocketserver_init_options {
         const char *address;
         unsigned short port;
         const char *servername;
+        int reuseport;
+        int backlog;
         int enabled;
         int started;
         int (*onevent) (struct medusa_websocketserver *websocketserver, unsigned int events, void *context, void *param);
@@ -124,6 +126,8 @@ struct medusa_websocketserver_init_options {
 
 struct medusa_websocketserver_accept_options {
         int enabled;
+        double read_timeout;
+        double write_timeout;
         int (*onevent) (struct medusa_websocketserver_client *websocketserver_client, unsigned int events, void *context, void *param);
         void *context;
 };
@@ -156,7 +160,12 @@ struct medusa_websocketserver * medusa_websocketserver_create (struct medusa_mon
 struct medusa_websocketserver * medusa_websocketserver_create_with_options (const struct medusa_websocketserver_init_options *options);
 void medusa_websocketserver_destroy (struct medusa_websocketserver *websocketserver);
 
-unsigned int medusa_websocketserver_get_state (const struct medusa_websocketserver *websocketserver);
+int medusa_websocketserver_get_state (const struct medusa_websocketserver *websocketserver);
+int medusa_websocketserver_get_error (const struct medusa_websocketserver *websocketserver);
+
+int medusa_websocketserver_get_protocol (struct medusa_websocketserver *websocketserver);
+int medusa_websocketserver_get_sockport (const struct medusa_websocketserver *websocketserver);
+int medusa_websocketserver_get_sockname (const struct medusa_websocketserver *websocketserver, struct sockaddr_storage *sockaddr);
 
 int medusa_websocketserver_set_enabled (struct medusa_websocketserver *websocketserver, int enabled);
 int medusa_websocketserver_get_enabled (const struct medusa_websocketserver *websocketserver);

@@ -2,6 +2,11 @@
 #if !defined(MEDUSA_MONITOR_H)
 #define MEDUSA_MONITOR_H
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 struct medusa_monitor;
 
 enum {
@@ -57,16 +62,16 @@ struct medusa_monitor_init_options {
                 unsigned int type;
                 union {
                         struct {
-
+                                int foo;
                         } epoll;
                         struct {
-
+                                int foo;
                         } kqueue;
                         struct {
-
+                                int foo;
                         } poll;
                         struct {
-
+                                int foo;
                         } select;
                 } u;
         } poll;
@@ -74,7 +79,7 @@ struct medusa_monitor_init_options {
                 unsigned int type;
                 union {
                         struct {
-
+                                int foo;
                         } timerfd;
                 } u;
         } timer;
@@ -82,7 +87,7 @@ struct medusa_monitor_init_options {
                 unsigned int type;
                 union {
                         struct {
-
+                                int foo;
                         } sigaction;
                 } u;
         } signal;
@@ -109,11 +114,6 @@ struct medusa_monitor_event_error {
                 struct medusa_monitor_event_error_subject_onevent subject_onevent;
         } u;
 };
-
-#ifdef __cplusplus
-extern "C"
-{
-#endif
 
 int medusa_monitor_init_options_default (struct medusa_monitor_init_options *options);
 

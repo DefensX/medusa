@@ -65,6 +65,7 @@ static int test_poll (unsigned int poll)
         struct medusa_monitor *monitor[NMONITORS];
         struct medusa_monitor_init_options options[NMONITORS];
 
+        struct medusa_timer *timer[NMONITORS];
         struct medusa_signal *signal[NMONITORS];
 
         for (i = 0; i < NMONITORS; i++) {
@@ -97,8 +98,8 @@ static int test_poll (unsigned int poll)
                         goto bail;
                 }
 
-                rc = medusa_timer_create_singleshot(monitor[i], 0.1, timer_onevent, NULL);
-                if (rc < 0) {
+                timer[i] = medusa_timer_create_singleshot(monitor[i], 0.1, timer_onevent, NULL);
+                if (MEDUSA_IS_ERR_OR_NULL(timer[i])) {
                         goto bail;
                 }
         }
@@ -164,7 +165,7 @@ int main (int argc, char *argv[])
 {
         int rc;
         unsigned int i;
-        
+
         pthread_t thread;
         pthread_attr_t thread_attr;
 

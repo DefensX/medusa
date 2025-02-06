@@ -6,7 +6,7 @@
 #include <getopt.h>
 #include <signal.h>
 
-#if defined(_WIN32)
+#if defined(__WINDOWS__)
 #include <winsock2.h>
 #endif
 
@@ -125,7 +125,7 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
                 rc  = medusa_httpserver_client_reply_send_start(httpserver_client);
                 rc |= medusa_httpserver_client_reply_send_status(httpserver_client, "1.1", 200, "OK");
                 rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "key", "value");
-                rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "Content-Length", "%d", (int) strlen("body"));
+                rc |= medusa_httpserver_client_reply_send_headerf(httpserver_client, "Content-Length", "%d", (int) strlen("body"));
                 rc |= medusa_httpserver_client_reply_send_header(httpserver_client, NULL, NULL);
                 rc |= medusa_httpserver_client_reply_send_bodyf(httpserver_client, "body");
                 rc |= medusa_httpserver_client_reply_send_finish(httpserver_client);
@@ -201,7 +201,7 @@ int main (int argc, char *argv[])
         struct medusa_httpserver_init_options httpserver_init_options;
         struct medusa_httpserver *httpserver;
 
-#if defined(_WIN32)
+#if defined(__WINDOWS__)
         WSADATA wsaData;
         WSAStartup(MAKEWORD(2,2), &wsaData);
 #endif

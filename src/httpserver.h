@@ -68,9 +68,11 @@ enum {
         MEDUSA_HTTPSERVER_CLIENT_EVENT_REQUEST_RECEIVE_TIMEOUT  = (1 <<  5),
         MEDUSA_HTTPSERVER_CLIENT_EVENT_BUFFERED_WRITE           = (1 <<  6),
         MEDUSA_HTTPSERVER_CLIENT_EVENT_BUFFERED_WRITE_FINISHED  = (1 <<  7),
-        MEDUSA_HTTPSERVER_CLIENT_EVENT_REPLY_SENT               = (1 <<  8),
-        MEDUSA_HTTPSERVER_CLIENT_EVENT_DISCONNECTED             = (1 <<  9),
-        MEDUSA_HTTPSERVER_CLIENT_EVENT_DESTROY                  = (1 << 10)
+        MEDUSA_HTTPSERVER_CLIENT_EVENT_BUFFERED_WRITE_TIMEOUT   = (1 <<  8),
+        MEDUSA_HTTPSERVER_CLIENT_EVENT_REPLY_SENDING            = (1 <<  9),
+        MEDUSA_HTTPSERVER_CLIENT_EVENT_REPLY_SENT               = (1 << 10),
+        MEDUSA_HTTPSERVER_CLIENT_EVENT_DISCONNECTED             = (1 << 11),
+        MEDUSA_HTTPSERVER_CLIENT_EVENT_DESTROY                  = (1 << 12)
 #define MEDUSA_HTTPSERVER_CLIENT_EVENT_ERROR                    MEDUSA_HTTPSERVER_CLIENT_EVENT_ERROR
 #define MEDUSA_HTTPSERVER_CLIENT_EVENT_CONNECTED                MEDUSA_HTTPSERVER_CLIENT_EVENT_CONNECTED
 #define MEDUSA_HTTPSERVER_CLIENT_EVENT_CONNECTED_SSL            MEDUSA_HTTPSERVER_CLIENT_EVENT_CONNECTED_SSL
@@ -79,6 +81,8 @@ enum {
 #define MEDUSA_HTTPSERVER_CLIENT_EVENT_REQUEST_RECEIVE_TIMEOUT  MEDUSA_HTTPSERVER_CLIENT_EVENT_REQUEST_RECEIVE_TIMEOUT
 #define MEDUSA_HTTPSERVER_CLIENT_EVENT_BUFFERED_WRITE           MEDUSA_HTTPSERVER_CLIENT_EVENT_BUFFERED_WRITE
 #define MEDUSA_HTTPSERVER_CLIENT_EVENT_BUFFERED_WRITE_FINISHED  MEDUSA_HTTPSERVER_CLIENT_EVENT_BUFFERED_WRITE_FINISHED
+#define MEDUSA_HTTPSERVER_CLIENT_EVENT_BUFFERED_WRITE_TIMEOUT   MEDUSA_HTTPSERVER_CLIENT_EVENT_BUFFERED_WRITE_TIMEOUT
+#define MEDUSA_HTTPSERVER_CLIENT_EVENT_REPLY_SENDING            MEDUSA_HTTPSERVER_CLIENT_EVENT_REPLY_SENDING
 #define MEDUSA_HTTPSERVER_CLIENT_EVENT_REPLY_SENT               MEDUSA_HTTPSERVER_CLIENT_EVENT_REPLY_SENT
 #define MEDUSA_HTTPSERVER_CLIENT_EVENT_DISCONNECTED             MEDUSA_HTTPSERVER_CLIENT_EVENT_DISCONNECTED
 #define MEDUSA_HTTPSERVER_CLIENT_EVENT_DESTROY                  MEDUSA_HTTPSERVER_CLIENT_EVENT_DESTROY
@@ -90,13 +94,15 @@ enum {
         MEDUSA_HTTPSERVER_CLIENT_STATE_CONNECTED                = 2,
         MEDUSA_HTTPSERVER_CLIENT_STATE_REQUEST_RECEIVING        = 3,
         MEDUSA_HTTPSERVER_CLIENT_STATE_REQUEST_RECEIVED         = 4,
+        MEDUSA_HTTPSERVER_CLIENT_STATE_REPLY_SENDING            = 5,
         MEDUSA_HTTPSERVER_CLIENT_STATE_REPLY_SENT               = 6,
-        MEDUSA_HTTPSERVER_CLIENT_STATE_ERROR                    = 5
+        MEDUSA_HTTPSERVER_CLIENT_STATE_ERROR                    = 7
 #define MEDUSA_HTTPSERVER_CLIENT_STATE_UNKNOWN                  MEDUSA_HTTPSERVER_CLIENT_STATE_UNKNOWN
 #define MEDUSA_HTTPSERVER_CLIENT_STATE_DISCONNECTED             MEDUSA_HTTPSERVER_CLIENT_STATE_DISCONNECTED
 #define MEDUSA_HTTPSERVER_CLIENT_STATE_CONNECTED                MEDUSA_HTTPSERVER_CLIENT_STATE_CONNECTED
 #define MEDUSA_HTTPSERVER_CLIENT_STATE_REQUEST_RECEIVING        MEDUSA_HTTPSERVER_CLIENT_STATE_REQUEST_RECEIVING
 #define MEDUSA_HTTPSERVER_CLIENT_STATE_REQUEST_RECEIVED         MEDUSA_HTTPSERVER_CLIENT_STATE_REQUEST_RECEIVED
+#define MEDUSA_HTTPSERVER_CLIENT_STATE_REPLY_SENDING            MEDUSA_HTTPSERVER_CLIENT_STATE_REPLY_SENDING
 #define MEDUSA_HTTPSERVER_CLIENT_STATE_REPLY_SENT               MEDUSA_HTTPSERVER_CLIENT_STATE_REPLY_SENT
 #define MEDUSA_HTTPSERVER_CLIENT_STATE_ERROR                    MEDUSA_HTTPSERVER_CLIENT_STATE_ERROR
 };
@@ -106,6 +112,8 @@ struct medusa_httpserver_init_options {
         unsigned int protocol;
         const char *address;
         unsigned short port;
+        int reuseport;
+        int backlog;
         int enabled;
         int started;
         int (*onevent) (struct medusa_httpserver *httpserver, unsigned int events, void *context, void *param);
@@ -114,6 +122,8 @@ struct medusa_httpserver_init_options {
 
 struct medusa_httpserver_accept_options {
         int enabled;
+        double read_timeout;
+        double write_timeout;
         int (*onevent) (struct medusa_httpserver_client *httpserver_client, unsigned int events, void *context, void *param);
         void *context;
 };
@@ -125,6 +135,27 @@ struct medusa_httpserver_client_event_request_received {
 struct medusa_httpserver_client_event_buffered_write {
         int64_t length;
         int64_t remaining;
+};
+
+enum {
+        MEDUSA_HTTPSERVER_CLIENT_ERROR_REASON_UNKNOWN   = 0,
+        MEDUSA_HTTPSERVER_CLIENT_ERROR_REASON_TCPSOCKET = 1
+#define MEDUSA_HTTPSERVER_CLIENT_ERROR_REASON_UNKNOWN   MEDUSA_HTTPSERVER_CLIENT_ERROR_REASON_UNKNOWN
+#define MEDUSA_HTTPSERVER_CLIENT_ERROR_REASON_TCPSOCKET MEDUSA_HTTPSERVER_CLIENT_ERROR_REASON_TCPSOCKET
+};
+
+struct medusa_httpserver_client_event_error {
+        unsigned int state;
+        unsigned int error;
+        unsigned int line;
+        unsigned int reason;
+        union {
+                struct {
+                        unsigned int state;
+                        unsigned int error;
+                        unsigned int line;
+                } tcpsocket;
+        } u;
 };
 
 #ifdef __cplusplus
@@ -142,6 +173,7 @@ int medusa_httpserver_get_state (const struct medusa_httpserver *httpserver);
 int medusa_httpserver_get_error (const struct medusa_httpserver *httpserver);
 
 int medusa_httpserver_get_protocol (struct medusa_httpserver *httpserver);
+int medusa_httpserver_get_sockport (const struct medusa_httpserver *httpserver);
 int medusa_httpserver_get_sockname (const struct medusa_httpserver *httpserver, struct sockaddr_storage *sockaddr);
 
 int medusa_httpserver_set_enabled (struct medusa_httpserver *httpserver, int enabled);
@@ -202,6 +234,9 @@ int medusa_httpserver_client_get_enabled (const struct medusa_httpserver_client 
 int medusa_httpserver_client_set_read_timeout (struct medusa_httpserver_client *httpserver_client, double timeout);
 double medusa_httpserver_client_get_read_timeout (const struct medusa_httpserver_client *httpserver_client);
 
+int medusa_httpserver_client_set_write_timeout (struct medusa_httpserver_client *httpserver_client, double timeout);
+double medusa_httpserver_client_get_write_timeout (const struct medusa_httpserver_client *httpserver_client);
+
 const struct medusa_httpserver_client_request * medusa_httprequest_client_get_request (const struct medusa_httpserver_client *httpserver_client);
 
 int medusa_httpserver_client_request_get_http_major (const struct medusa_httpserver_client_request *request);
@@ -231,15 +266,18 @@ int64_t medusa_httpserver_client_request_body_get_length (const struct medusa_ht
 const void * medusa_httpserver_client_request_body_get_value (const struct medusa_httpserver_client_request_body *body);
 
 int medusa_httpserver_client_reply_send_start (struct medusa_httpserver_client *httpserver_client);
-int medusa_httpserver_client_reply_send_status (struct medusa_httpserver_client *httpserver_client, const char *version, int code, const char *reason, ...) __attribute__((format(printf, 4, 5)));
-int medusa_httpserver_client_reply_send_vstatus (struct medusa_httpserver_client *httpserver_client, const char *version, int code, const char *reason, va_list va);
-int medusa_httpserver_client_reply_send_header (struct medusa_httpserver_client *httpserver_client, const char *key, const char *value, ...) __attribute__((format(printf, 3, 4)));
-int medusa_httpserver_client_reply_send_vheader (struct medusa_httpserver_client *httpserver_client, const char *key, const char *value, va_list va);
+int medusa_httpserver_client_reply_send_status (struct medusa_httpserver_client *httpserver_client, const char *version, int code, const char *reason);
+int medusa_httpserver_client_reply_send_statusf (struct medusa_httpserver_client *httpserver_client, const char *version, int code, const char *reason, ...) __attribute__((format(printf, 4, 5)));
+int medusa_httpserver_client_reply_send_statusv (struct medusa_httpserver_client *httpserver_client, const char *version, int code, const char *reason, va_list va);
+int medusa_httpserver_client_reply_send_header (struct medusa_httpserver_client *httpserver_client, const char *key, const char *value);
+int medusa_httpserver_client_reply_send_headerf (struct medusa_httpserver_client *httpserver_client, const char *key, const char *value, ...) __attribute__((format(printf, 3, 4)));
+int medusa_httpserver_client_reply_send_headerv (struct medusa_httpserver_client *httpserver_client, const char *key, const char *value, va_list va);
 int medusa_httpserver_client_reply_send_body (struct medusa_httpserver_client *httpserver_client, const void *body, int length);
 int medusa_httpserver_client_reply_send_bodyf (struct medusa_httpserver_client *httpserver_client, const char *body, ...) __attribute__((format(printf, 2, 3)));
-int medusa_httpserver_client_reply_send_vbody (struct medusa_httpserver_client *httpserver_client, const char *body, va_list va);
+int medusa_httpserver_client_reply_send_bodyv (struct medusa_httpserver_client *httpserver_client, const char *body, va_list va);
 int medusa_httpserver_client_reply_send_finish (struct medusa_httpserver_client *httpserver_client);
 
+int medusa_httpserver_client_get_fd (struct medusa_httpserver_client *httpserver_client);
 int medusa_httpserver_client_get_sockname (struct medusa_httpserver_client *httpserver_client, struct sockaddr_storage *sockaddr);
 int medusa_httpserver_client_get_peername (struct medusa_httpserver_client *httpserver_client, struct sockaddr_storage *sockaddr);
 

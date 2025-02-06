@@ -30,6 +30,7 @@ struct medusa_websocketserver {
         struct medusa_subject subject;
         unsigned int state;
         unsigned int flags;
+        unsigned int error;
         int (*onevent) (struct medusa_websocketserver *websocketserver, unsigned int events, void *context, void *param);
         void *context;
         void *userdata;
@@ -37,6 +38,8 @@ struct medusa_websocketserver {
         char *address;
         unsigned short port;
         char *servername;
+        int reuseport;
+        int backlog;
         int buffered;
         struct medusa_tcpsocket *tcpsocket;
         struct medusa_websocketserver_clients clients;

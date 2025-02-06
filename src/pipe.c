@@ -8,7 +8,7 @@
 
 #include "pipe.h"
 
-#if defined(_WIN32)
+#if defined(__WINDOWS__)
 
 #include <winsock2.h>
 #include <wspiapi.h>

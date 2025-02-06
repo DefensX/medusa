@@ -7,6 +7,10 @@
 #include <time.h>
 #include <errno.h>
 
+#if defined(__WINDOWS__)
+#include <windows.h>
+#endif
+
 #include "medusa/error.h"
 #include "medusa/timer.h"
 #include "medusa/monitor.h"
@@ -19,7 +23,9 @@ static const unsigned int g_polls[] = {
 #if defined(__APPLE__)
         MEDUSA_MONITOR_POLL_KQUEUE,
 #endif
+#if defined(__LINUX__) || defined(__APPLE__)
         MEDUSA_MONITOR_POLL_POLL,
+#endif
         MEDUSA_MONITOR_POLL_SELECT
 };
 
@@ -47,6 +53,7 @@ static int test_poll (unsigned int poll)
         int rc;
         unsigned int i;
 
+        struct medusa_timer *timer;
         struct medusa_monitor *monitor;
         struct medusa_monitor_init_options options;
 
@@ -63,8 +70,8 @@ static int test_poll (unsigned int poll)
         }
 
         for (i = 0; i < g_ntimers; i++) {
-                rc = medusa_timer_create_singleshot(monitor, 0.05, timer_onevent, NULL);
-                if (rc < 0) {
+                timer = medusa_timer_create_singleshot(monitor, 0.05, timer_onevent, NULL);
+                if (MEDUSA_IS_ERR_OR_NULL(timer)) {
                         fprintf(stderr, "medusa_timer_create_singleshot failed\n");
                         goto bail;
                 }
@@ -100,11 +107,15 @@ bail:   if (monitor != NULL) {
         return -1;
 }
 
+#if !defined(__WINDOWS__)
+
 static void alarm_handler (int sig)
 {
         (void) sig;
         abort();
 }
+
+#endif
 
 int main (int argc, char *argv[])
 {
@@ -114,17 +125,27 @@ int main (int argc, char *argv[])
         (void) argc;
         (void) argv;
 
+#if defined(__WINDOWS__)
+        WSADATA wsaData;
+        WSAStartup(MAKEWORD(2,2), &wsaData);
+#endif
+
         srand(time(NULL));
+#if !defined(__WINDOWS__)
         signal(SIGALRM, alarm_handler);
+#endif
 
         g_ntimers = 100000;
 
         for (i = 0; i < sizeof(g_polls) / sizeof(g_polls[0]); i++) {
+#if !defined(__WINDOWS__)
                 alarm(5);
+#endif
                 fprintf(stderr, "testing poll: %d\n", g_polls[i]);
 
                 rc = test_poll(g_polls[i]);
                 if (rc != 0) {
+                        fprintf(stderr, "failed\n");
                         return -1;
                 }
         }

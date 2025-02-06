@@ -19,6 +19,9 @@
 
 #include <pthread.h>
 
+#define MEDUSA_DEBUG_NAME       "exec"
+
+#include "debug.h"
 #include "error.h"
 #include "pool.h"
 #include "queue.h"
@@ -204,6 +207,7 @@ static int exec_timer_onevent (struct medusa_timer *timer, unsigned int events, 
                                 exec->wstatus = status;
                                 rc = medusa_exec_onevent(exec, MEDUSA_EXEC_EVENT_STOPPED, NULL);
                                 if (rc < 0) {
+                                        medusa_errorf("medusa_exec_onevent failed, rc: %d", rc);
                                         return rc;
                                 }
                                 return 0;
@@ -219,6 +223,7 @@ static int exec_timer_onevent (struct medusa_timer *timer, unsigned int events, 
                         exec->wstatus = status;
                         rc = medusa_exec_onevent(exec, MEDUSA_EXEC_EVENT_STOPPED, NULL);
                         if (rc < 0) {
+                                medusa_errorf("medusa_exec_onevent failed, rc: %d", rc);
                                 return rc;
                         }
                         return 0;
@@ -759,6 +764,9 @@ __attribute__ ((visibility ("default"))) int medusa_exec_onevent_unlocked (struc
                     (events & MEDUSA_EXEC_EVENT_DESTROY)) {
                         medusa_monitor_unlock(monitor);
                         rc = exec->onevent(exec, events, exec->context, param);
+                        if (rc < 0) {
+                                medusa_errorf("exec->onevent failed, rc: %d", rc);
+                        }
                         medusa_monitor_lock(monitor);
                 }
         }

@@ -27,11 +27,17 @@ const char * medusa_dnsrequest_get_nameserver_unlocked (struct medusa_dnsrequest
 int medusa_dnsrequest_set_port_unlocked (struct medusa_dnsrequest *dnsrequest, unsigned int port);
 int medusa_dnsrequest_get_port_unlocked (struct medusa_dnsrequest *dnsrequest);
 
+int medusa_dnsrequest_set_code_unlocked (struct medusa_dnsrequest *dnsrequest, unsigned int code);
+int medusa_dnsrequest_get_code_unlocked (struct medusa_dnsrequest *dnsrequest);
+
 int medusa_dnsrequest_set_type_unlocked (struct medusa_dnsrequest *dnsrequest, unsigned int type);
 int medusa_dnsrequest_get_type_unlocked (struct medusa_dnsrequest *dnsrequest);
 
 int medusa_dnsrequest_set_name_unlocked (struct medusa_dnsrequest *dnsrequest, const char *name);
 const char * medusa_dnsrequest_get_name_unlocked (struct medusa_dnsrequest *dnsrequest);
+
+int medusa_dnsrequest_set_id_unlocked (struct medusa_dnsrequest *dnsrequest, int id);
+int medusa_dnsrequest_get_id_unlocked (struct medusa_dnsrequest *dnsrequest);
 
 int medusa_dnsrequest_set_context_unlocked (struct medusa_dnsrequest *dnsrequest, void *context);
 void * medusa_dnsrequest_get_context_unlocked (struct medusa_dnsrequest *dnsrequest);

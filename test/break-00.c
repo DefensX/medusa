@@ -15,23 +15,28 @@ static void alarm_handler (int sig)
         abort();
 }
 
+struct thread_arg {
+        int rc;
+        struct medusa_monitor *monitor;
+};
+
 static void * thread_worker (void *arg)
 {
-        int rc;
-        struct medusa_monitor *monitor = (struct medusa_monitor *) arg;
+        struct thread_arg *thread_arg  = (struct thread_arg *) arg;
         usleep(500000);
         fprintf(stderr, "breaking\n");
-        rc = medusa_monitor_break(monitor);
-        pthread_exit((void *) (*(int **) &rc));
+        thread_arg->rc = medusa_monitor_break(thread_arg->monitor);
+        pthread_exit(NULL);
         return NULL;
 }
 
 int main (int argc, char *argv[])
 {
-        int rc;
-
         pthread_t thread;
         struct medusa_monitor *monitor;
+
+        int rc;
+        struct thread_arg thread_arg;
 
         (void) argc;
         (void) argv;
@@ -47,7 +52,9 @@ int main (int argc, char *argv[])
                 return -1;
         }
 
-        pthread_create(&thread, NULL, thread_worker, monitor);
+        thread_arg.rc      = -1;
+        thread_arg.monitor = monitor;
+        pthread_create(&thread, NULL, thread_worker, &thread_arg);
 
         fprintf(stderr, "run...\n");
         rc = medusa_monitor_run(monitor);
@@ -56,8 +63,9 @@ int main (int argc, char *argv[])
         }
         fprintf(stderr, "done...\n");
 
-        pthread_join(thread, (void **) &rc);
-        if (rc != 0) {
+        pthread_join(thread, NULL);
+        if (thread_arg.rc != 0) {
+                fprintf(stderr, "rc: %d is invalid\n", thread_arg.rc);
                 return -1;
         }
         medusa_monitor_destroy(monitor);

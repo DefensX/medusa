@@ -229,8 +229,9 @@ static int server_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket, unsigne
                 tcpsocket_accept_options.context     = session;
                 session->tcpsocket = medusa_tcpsocket_accept_with_options(tcpsocket, &tcpsocket_accept_options);
                 if (MEDUSA_IS_ERR_OR_NULL(session->tcpsocket)) {
+                        int err = MEDUSA_PTR_ERR(session->tcpsocket);
                         session_destroy(session);
-                        return MEDUSA_PTR_ERR(session->tcpsocket);
+                        return err;
                 }
                 TAILQ_INSERT_TAIL(&server->sessions, session, list);
 

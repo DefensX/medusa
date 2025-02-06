@@ -8,6 +8,9 @@
 
 #include <pthread.h>
 
+#define MEDUSA_DEBUG_NAME       "io"
+
+#include "debug.h"
 #include "error.h"
 #include "pool.h"
 #include "queue.h"
@@ -622,6 +625,9 @@ __attribute__ ((visibility ("default"))) int medusa_io_onevent_unlocked (struct 
                     (events & MEDUSA_IO_EVENT_DESTROY)) {
                         medusa_monitor_unlock(monitor);
                         rc = io->onevent(io, events, io->context, param);
+                        if (rc < 0) {
+                                medusa_errorf("io->onevent failed, ret: %d", rc);
+                        }
                         medusa_monitor_lock(monitor);
                 }
         }

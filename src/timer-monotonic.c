@@ -14,6 +14,7 @@
 struct internal {
         struct medusa_timer_backend backend;
         struct timespec timespec;
+        int valid;
 };
 
 static int internal_set (struct medusa_timer_backend *backend, struct timespec *timespec)
@@ -25,9 +26,11 @@ static int internal_set (struct medusa_timer_backend *backend, struct timespec *
         if (timespec == NULL) {
                 internal->timespec.tv_sec  = 0;
                 internal->timespec.tv_nsec = 0;
+                internal->valid = 0;
         } else {
                 internal->timespec.tv_sec  = timespec->tv_sec;
                 internal->timespec.tv_nsec = timespec->tv_nsec;
+                internal->valid = 1;
         }
         return 0;
 bail:   return -1;
@@ -44,7 +47,7 @@ static int internal_get (struct medusa_timer_backend *backend, struct timespec *
         if (timespec == NULL) {
                 goto bail;
         }
-        if (medusa_timespec_isset(&internal->timespec)) {
+        if (internal->valid == 1) {
                 rc = medusa_clock_monotonic(&now);
                 if (rc < 0) {
                         goto bail;
@@ -52,9 +55,9 @@ static int internal_get (struct medusa_timer_backend *backend, struct timespec *
                 timespec->tv_sec  = internal->timespec.tv_sec;
                 timespec->tv_nsec = internal->timespec.tv_nsec;
                 medusa_timespec_sub(timespec, &now, timespec);
-        } else {
-                medusa_timespec_clear(timespec);
+                return 1;
         }
+        medusa_timespec_clear(timespec);
         return 0;
 bail:   return -1;
 }

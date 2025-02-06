@@ -6,7 +6,10 @@
 #include <string.h>
 #include <errno.h>
 
+#define MEDUSA_DEBUG_NAME       "signal"
+
 #include "clock.h"
+#include "debug.h"
 #include "error.h"
 #include "pool.h"
 #include "queue.h"
@@ -554,6 +557,9 @@ __attribute__ ((visibility ("default"))) int medusa_signal_onevent_unlocked (str
                     (events & MEDUSA_SIGNAL_EVENT_DESTROY)) {
                         medusa_monitor_unlock(monitor);
                         rc = signal->onevent(signal, events, signal->context, param);
+                        if (rc < 0) {
+                                medusa_errorf("signal->onevent failed, rc: %d", rc);
+                        }
                         medusa_monitor_lock(monitor);
                 }
         }

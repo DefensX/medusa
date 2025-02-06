@@ -86,6 +86,30 @@ struct medusa_httprequest_init_options {
         void *context;
 };
 
+enum {
+        MEDUSA_HTTPREQUEST_ERROR_REASON_PARSER          = 0,
+        MEDUSA_HTTPREQUEST_ERROR_REASON_TCPSOCKET       = 1
+#define MEDUSA_HTTPREQUEST_ERROR_REASON_PARSER          MEDUSA_HTTPREQUEST_ERROR_REASON_PARSER
+#define MEDUSA_HTTPREQUEST_ERROR_REASON_TCPSOCKET       MEDUSA_HTTPREQUEST_ERROR_REASON_TCPSOCKET
+};
+
+struct medusa_httprequest_event_error {
+        unsigned int state;
+        unsigned int error;
+        unsigned int line;
+        unsigned int reason;
+        union {
+                struct {
+                        unsigned int state;
+                        unsigned int error;
+                        unsigned int line;
+                } tcpsocket;
+                struct {
+                        unsigned int error;
+                } parser;
+        } u;
+};
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -114,11 +138,19 @@ int medusa_httprequest_set_url (struct medusa_httprequest *httprequest, const ch
 int medusa_httprequest_set_vurl (struct medusa_httprequest *httprequest, const char *url, va_list va);
 const char * medusa_httprequest_get_url (const struct medusa_httprequest *httprequest);
 
-int medusa_httprequest_add_header (struct medusa_httprequest *httprequest, const char *key, const char *value, ...) __attribute__((format(printf, 3, 4)));
+int medusa_httprequest_add_header (struct medusa_httprequest *httprequest, const char *key, const char *value);
+int medusa_httprequest_add_headerf (struct medusa_httprequest *httprequest, const char *key, const char *value, ...) __attribute__((format(printf, 3, 4)));
 int medusa_httprequest_add_headerv (struct medusa_httprequest *httprequest, const char *key, const char *value, va_list va);
 
-int medusa_httprequest_add_raw_header (struct medusa_httprequest *httprequest, const char *value, ...) __attribute__((format(printf, 2, 3)));
+int medusa_httprequest_add_raw_header (struct medusa_httprequest *httprequest, const char *value);
+int medusa_httprequest_add_raw_headerf (struct medusa_httprequest *httprequest, const char *value, ...) __attribute__((format(printf, 2, 3)));
 int medusa_httprequest_add_raw_headerv (struct medusa_httprequest *httprequest, const char *value, va_list va);
+
+int medusa_httprequest_make_request (struct medusa_httprequest *httprequest, const void *data, int64_t length);
+int medusa_httprequest_make_requestf (struct medusa_httprequest *httprequest, const char *data, ...) __attribute__((format(printf, 2, 3)));
+int medusa_httprequest_make_requestv (struct medusa_httprequest *httprequest, const char *data, va_list va);
+
+int medusa_httprequest_make_get (struct medusa_httprequest *httprequest);
 
 int medusa_httprequest_make_post (struct medusa_httprequest *httprequest, const void *data, int64_t length);
 int medusa_httprequest_make_postf (struct medusa_httprequest *httprequest, const char *data, ...) __attribute__((format(printf, 2, 3)));

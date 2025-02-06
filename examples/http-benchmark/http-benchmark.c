@@ -8,7 +8,7 @@
 #include <time.h>
 #include <fcntl.h>
 
-#if defined(_WIN32)
+#if defined(__WINDOWS__)
 #include <winsock2.h>
 #include <wspiapi.h>
 #else
@@ -660,7 +660,7 @@ again:
                 rc = -EIO;
                 goto bail;
         }
-#if defined(_WIN32)
+#if defined(__WINDOWS__)
         unsigned long nonblocking = 1;
         rc = ioctlsocket(fd, FIONBIO, &nonblocking);
 #else
@@ -1305,6 +1305,7 @@ int main (int argc, char *argv[])
 out:    TAILQ_FOREACH_SAFE(client, &clients, clients, nclient) {
                 TAILQ_REMOVE(&clients, client, clients);
                 client_destroy(client);
+                nclients = nclients - 1;
         }
         TAILQ_FOREACH_SAFE(port, &ports, ports, nport) {
                 TAILQ_REMOVE(&ports, port, ports);

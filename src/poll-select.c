@@ -5,13 +5,16 @@
 #include <unistd.h>
 #include <errno.h>
 
-#if defined(_WIN32)
+#if defined(__WINDOWS__)
 #define FD_SETSIZE      8192
 #include <winsock2.h>
 #else
 #include <sys/select.h>
 #endif
 
+#define MEDUSA_DEBUG_NAME       "poll-select"
+
+#include "debug.h"
 #include "queue.h"
 #include "subject-struct.h"
 #include "io.h"
@@ -23,7 +26,7 @@
 
 #if defined(__DARWIN__) && (__DARWIN__ == 1)
 #define SELECT_FD_SETSIZE       __DARWIN_FD_SETSIZE
-#elif defined(_WIN32)
+#elif defined(__WINDOWS__)
 #define SELECT_FD_SETSIZE       FD_SETSIZE
 #else
 #define SELECT_FD_SETSIZE       __FD_SETSIZE
@@ -192,6 +195,7 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
                 io = internal->ios[i];
                 rc = internal->onevent(backend, io, events, internal->context, NULL);
                 if (rc < 0) {
+                        medusa_errorf("internal->onevent failed, rc: %d", rc);
                         goto bail;
                 }
         }

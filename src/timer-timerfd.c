@@ -15,7 +15,8 @@
 
 struct internal {
         struct medusa_timer_backend backend;
-        int tfd;
+        int fd;
+        int valid;
 };
 
 static int fd_set_blocking (int fd, int on)
@@ -40,7 +41,7 @@ static int internal_fd (struct medusa_timer_backend *backend)
         if (internal == NULL) {
                 goto bail;
         }
-        return internal->tfd;
+        return internal->fd;
 bail:   return -1;
 }
 
@@ -57,13 +58,15 @@ static int internal_set (struct medusa_timer_backend *backend, struct timespec *
                 itimerspec.it_value.tv_nsec    = 0;
                 itimerspec.it_interval.tv_sec  = 0;
                 itimerspec.it_interval.tv_nsec = 0;
+                internal->valid = 0;
         } else {
                 itimerspec.it_value.tv_sec     = timespec->tv_sec;
                 itimerspec.it_value.tv_nsec    = timespec->tv_nsec;
                 itimerspec.it_interval.tv_sec  = 0;
                 itimerspec.it_interval.tv_nsec = 0;
+                internal->valid = 1;
         }
-        rc = timerfd_settime(internal->tfd, TFD_TIMER_ABSTIME, &itimerspec, NULL);
+        rc = timerfd_settime(internal->fd, TFD_TIMER_ABSTIME, &itimerspec, NULL);
         if (rc != 0) {
                 goto bail;
         }
@@ -82,13 +85,13 @@ static int internal_get (struct medusa_timer_backend *backend, struct timespec *
         if (timespec == NULL) {
                 goto bail;
         }
-        rc = timerfd_gettime(internal->tfd, &itimerspec);
+        rc = timerfd_gettime(internal->fd, &itimerspec);
         if (rc != 0) {
                 goto bail;
         }
         timespec->tv_sec  = itimerspec.it_value.tv_sec;
         timespec->tv_nsec = itimerspec.it_value.tv_nsec;
-        return 0;
+        return internal->valid;
 bail:   return -1;
 }
 
@@ -98,8 +101,8 @@ static void internal_destroy (struct medusa_timer_backend *backend)
         if (internal == NULL) {
                 return;
         }
-        if (internal->tfd >= 0) {
-                close(internal->tfd);
+        if (internal->fd >= 0) {
+                close(internal->fd);
         }
         free(internal);
 }
@@ -114,11 +117,11 @@ struct medusa_timer_backend * medusa_timer_timerfd_create (const struct medusa_t
                 goto bail;
         }
         memset(internal, 0, sizeof(struct internal));
-        internal->tfd = timerfd_create(CLOCK_MONOTONIC, 0);
-        if (internal->tfd < 0) {
+        internal->fd = timerfd_create(CLOCK_MONOTONIC, 0);
+        if (internal->fd < 0) {
                 goto bail;
         }
-        rc = fd_set_blocking(internal->tfd, 0);
+        rc = fd_set_blocking(internal->fd, 0);
         if (rc != 0) {
                 goto bail;
         }
