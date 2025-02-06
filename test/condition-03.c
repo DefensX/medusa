@@ -83,6 +83,9 @@ static int test_poll (unsigned int poll)
 
         unsigned int signals;
 
+        struct medusa_timer *timer1;
+        struct medusa_timer *timer2;
+
         struct medusa_condition *condition1;
         struct medusa_condition *condition2;
 
@@ -115,13 +118,13 @@ static int test_poll (unsigned int poll)
                 goto bail;
         }
 
-        rc = medusa_timer_create_singleshot(monitor, 0.1, timer1_onevent, condition1);
-        if (rc < 0) {
+        timer1 = medusa_timer_create_singleshot(monitor, 0.1, timer1_onevent, condition1);
+        if (MEDUSA_IS_ERR_OR_NULL(timer1)) {
                 goto bail;
         }
 
-        rc = medusa_timer_create_singleshot(monitor, 0.2, timer2_onevent, condition2);
-        if (rc < 0) {
+        timer2 = medusa_timer_create_singleshot(monitor, 0.2, timer2_onevent, condition2);
+        if (MEDUSA_IS_ERR_OR_NULL(timer2)) {
                 goto bail;
         }
 

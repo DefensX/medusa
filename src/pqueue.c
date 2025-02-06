@@ -14,7 +14,7 @@
 #define pqueue_right(i)         ((2 * (i)) + 1)
 #define pqueue_parent(i)        ((i) / 2)
 
-struct pqueue_head {
+struct medusa_pqueue_head {
         void **entries;
         unsigned int count;
         unsigned int size;
@@ -24,18 +24,18 @@ struct pqueue_head {
         unsigned int (*getpos) (void *entry);
 };
 
-struct pqueue_head * pqueue_create (
+struct medusa_pqueue_head * medusa_pqueue_create (
         unsigned int size, unsigned int step,
         int (*compare) (void *a, void *b),
         void (*setpos) (void *entry, unsigned int position),
         unsigned int (*getpos) (void *entry))
 {
-        struct pqueue_head *head;
-        head = malloc(sizeof(struct pqueue_head));
+        struct medusa_pqueue_head *head;
+        head = malloc(sizeof(struct medusa_pqueue_head));
         if (head == NULL) {
                 goto bail;
         }
-        memset(head, 0, sizeof(struct pqueue_head));
+        memset(head, 0, sizeof(struct medusa_pqueue_head));
         head->size = size;
         head->step = step ? step : 1;
         head->compare = compare;
@@ -50,12 +50,12 @@ struct pqueue_head * pqueue_create (
         }
         return head;
 bail:   if (head != NULL) {
-                pqueue_destroy(head);
+                medusa_pqueue_destroy(head);
         }
         return NULL;
 }
 
-void pqueue_destroy (struct pqueue_head *head)
+void medusa_pqueue_destroy (struct medusa_pqueue_head *head)
 {
         if (head == NULL) {
                 return;
@@ -66,12 +66,12 @@ void pqueue_destroy (struct pqueue_head *head)
         free(head);
 }
 
-unsigned int pqueue_count (struct pqueue_head *head)
+unsigned int medusa_pqueue_count (struct medusa_pqueue_head *head)
 {
         return head->count -1;
 }
 
-static inline void pqueue_shift_up (struct pqueue_head *head, unsigned int i)
+static inline void pqueue_shift_up (struct medusa_pqueue_head *head, unsigned int i)
 {
         void *e;
         unsigned int p;
@@ -87,7 +87,7 @@ static inline void pqueue_shift_up (struct pqueue_head *head, unsigned int i)
         head->setpos(head->entries[i], i);
 }
 
-static inline void pqueue_shift_down (struct pqueue_head *head, unsigned int i)
+static inline void pqueue_shift_down (struct medusa_pqueue_head *head, unsigned int i)
 {
         void *e;
         unsigned int c;
@@ -112,7 +112,7 @@ static inline void pqueue_shift_down (struct pqueue_head *head, unsigned int i)
         head->setpos(e, i);
 }
 
-int pqueue_add (struct pqueue_head *head, void *entry)
+int medusa_pqueue_add (struct medusa_pqueue_head *head, void *entry)
 {
         unsigned int i;
         if (head->count + 1 >= head->size) {
@@ -141,7 +141,7 @@ int pqueue_add (struct pqueue_head *head, void *entry)
 bail:   return -1;
 }
 
-int pqueue_mod (struct pqueue_head *head, void *entry, int compare)
+int medusa_pqueue_mod (struct medusa_pqueue_head *head, void *entry, int compare)
 {
         unsigned int i;
         i = head->getpos(entry);
@@ -153,7 +153,7 @@ int pqueue_mod (struct pqueue_head *head, void *entry, int compare)
         return 0;
 }
 
-int pqueue_del (struct pqueue_head *head, void *entry)
+int medusa_pqueue_del (struct medusa_pqueue_head *head, void *entry)
 {
         unsigned int i;
         i = head->getpos(entry);
@@ -171,7 +171,7 @@ int pqueue_del (struct pqueue_head *head, void *entry)
 bail:   return -1;
 }
 
-void * pqueue_peek (struct pqueue_head *head)
+void * medusa_pqueue_peek (struct medusa_pqueue_head *head)
 {
         void *e;
         if (head->count == 1) {
@@ -181,7 +181,7 @@ void * pqueue_peek (struct pqueue_head *head)
         return e;
 }
 
-void * pqueue_pop (struct pqueue_head *head)
+void * medusa_pqueue_pop (struct medusa_pqueue_head *head)
 {
         void *e;
         if (head->count == 1) {
@@ -194,7 +194,7 @@ void * pqueue_pop (struct pqueue_head *head)
         return e;
 }
 
-static int pqueue_search_actual (struct pqueue_head *head, void *key, int (*callback) (void *context, void *entry), void *context, unsigned int pos)
+static int pqueue_search_actual (struct medusa_pqueue_head *head, void *key, int (*callback) (void *context, void *entry), void *context, unsigned int pos)
 {
         int rc;
         if (pqueue_left(pos) < head->count) {
@@ -224,7 +224,7 @@ static int pqueue_search_actual (struct pqueue_head *head, void *key, int (*call
         return 0;
 }
 
-int pqueue_search (struct pqueue_head *head, void *key, int (*callback) (void *context, void *entry), void *context)
+int medusa_pqueue_search (struct medusa_pqueue_head *head, void *key, int (*callback) (void *context, void *entry), void *context)
 {
         int rc;
         if (1 < head->count) {
@@ -242,7 +242,7 @@ int pqueue_search (struct pqueue_head *head, void *key, int (*callback) (void *c
         return 0;
 }
 
-static int pqueue_traverse_actual (struct pqueue_head *head, int (*callback) (void *context, void *entry), void *context, unsigned int pos)
+static int pqueue_traverse_actual (struct medusa_pqueue_head *head, int (*callback) (void *context, void *entry), void *context, unsigned int pos)
 {
         int rc;
         if (pqueue_left(pos) < head->count) {
@@ -268,7 +268,7 @@ static int pqueue_traverse_actual (struct pqueue_head *head, int (*callback) (vo
         return 0;
 }
 
-int pqueue_traverse (struct pqueue_head *head, int (*callback) (void *context, void *entry), void *context)
+int medusa_pqueue_traverse (struct medusa_pqueue_head *head, int (*callback) (void *context, void *entry), void *context)
 {
         int rc;
         if (1 < head->count) {
@@ -284,7 +284,7 @@ int pqueue_traverse (struct pqueue_head *head, int (*callback) (void *context, v
         return 0;
 }
 
-static int pqueue_is_valid_actual (struct pqueue_head *head, unsigned int pos)
+static int pqueue_is_valid_actual (struct medusa_pqueue_head *head, unsigned int pos)
 {
         if (pqueue_left(pos) < head->count) {
                 if (head->compare(head->entries[pos], head->entries[pqueue_left(pos)]) > 0) {
@@ -305,7 +305,7 @@ static int pqueue_is_valid_actual (struct pqueue_head *head, unsigned int pos)
         return 1;
 }
 
-int pqueue_verify (struct pqueue_head *head)
+int medusa_pqueue_verify (struct medusa_pqueue_head *head)
 {
         return pqueue_is_valid_actual(head, 1);
 }

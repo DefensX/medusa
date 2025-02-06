@@ -16,4 +16,7 @@ int medusa_monitor_add_unlocked (struct medusa_monitor *monitor, struct medusa_s
 int medusa_monitor_mod_unlocked (struct medusa_subject *subject);
 int medusa_monitor_del_unlocked (struct medusa_subject *subject);
 
+struct medusa_subject * medusa_monitor_get_first_subject_unlocked (struct medusa_monitor *monitor);
+struct medusa_subject * medusa_monitor_get_next_subject_unlocked (struct medusa_subject *subject);
+
 #endif

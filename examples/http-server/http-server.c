@@ -6,6 +6,10 @@
 #include <getopt.h>
 #include <signal.h>
 
+#if defined(__WINDOWS__)
+#include <winsock2.h>
+#endif
+
 #include <medusa/error.h>
 #include <medusa/httpserver.h>
 #include <medusa/monitor.h>
@@ -83,7 +87,7 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
                         goto bail;
                 }
                 fprintf(stderr, "options\n");
-                fprintf(stderr, "  count: %ld\n", medusa_httpserver_client_request_options_get_count(httpserver_client_request_options));
+                fprintf(stderr, "  count: %d\n", (int) medusa_httpserver_client_request_options_get_count(httpserver_client_request_options));
                 for (httpserver_client_request_option = medusa_httpserver_client_request_options_get_first(httpserver_client_request_options);
                      httpserver_client_request_option;
                      httpserver_client_request_option = medusa_httpserver_client_request_option_get_next(httpserver_client_request_option)) {
@@ -98,7 +102,7 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
                         goto bail;
                 }
                 fprintf(stderr, "headers\n");
-                fprintf(stderr, "  count: %ld\n", medusa_httpserver_client_request_headers_get_count(httpserver_client_request_headers));
+                fprintf(stderr, "  count: %lld\n", (long long int) medusa_httpserver_client_request_headers_get_count(httpserver_client_request_headers));
                 for (httpserver_client_request_header = medusa_httpserver_client_request_headers_get_first(httpserver_client_request_headers);
                      httpserver_client_request_header;
                      httpserver_client_request_header = medusa_httpserver_client_request_header_get_next(httpserver_client_request_header)) {
@@ -113,15 +117,15 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
                         goto bail;
                 }
                 fprintf(stderr, "body\n");
-                fprintf(stderr, "  length: %ld\n", medusa_httpserver_client_request_body_get_length(httpserver_client_request_body));
+                fprintf(stderr, "  length: %lld\n", (long long int) medusa_httpserver_client_request_body_get_length(httpserver_client_request_body));
                 fprintf(stderr, "  value : %.*s\n",
                         (int) medusa_httpserver_client_request_body_get_length(httpserver_client_request_body),
                         (char *) medusa_httpserver_client_request_body_get_value(httpserver_client_request_body));
 
                 rc  = medusa_httpserver_client_reply_send_start(httpserver_client);
-                rc |= medusa_httpserver_client_reply_send_status(httpserver_client, 200, "OK");
+                rc |= medusa_httpserver_client_reply_send_status(httpserver_client, "1.1", 200, "OK");
                 rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "key", "value");
-                rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "Content-Length", "%d", (int) strlen("body"));
+                rc |= medusa_httpserver_client_reply_send_headerf(httpserver_client, "Content-Length", "%d", (int) strlen("body"));
                 rc |= medusa_httpserver_client_reply_send_header(httpserver_client, NULL, NULL);
                 rc |= medusa_httpserver_client_reply_send_bodyf(httpserver_client, "body");
                 rc |= medusa_httpserver_client_reply_send_finish(httpserver_client);
@@ -197,6 +201,11 @@ int main (int argc, char *argv[])
         struct medusa_httpserver_init_options httpserver_init_options;
         struct medusa_httpserver *httpserver;
 
+#if defined(__WINDOWS__)
+        WSADATA wsaData;
+        WSAStartup(MAKEWORD(2,2), &wsaData);
+#endif
+
         g_running = 1;
         signal(SIGINT, sigint_handler);
 
@@ -249,7 +258,7 @@ int main (int argc, char *argv[])
 
         httpserver = medusa_httpserver_create_with_options(&httpserver_init_options);
         if (MEDUSA_IS_ERR_OR_NULL(httpserver)) {
-                fprintf(stderr, "can not create httpserver errno: %ld, %s\n", MEDUSA_PTR_ERR(httpserver), strerror(MEDUSA_PTR_ERR(httpserver)));
+                fprintf(stderr, "can not create httpserver errno: %d, %s\n", MEDUSA_PTR_ERR(httpserver), strerror(MEDUSA_PTR_ERR(httpserver)));
                 goto bail;
         }
         rc = medusa_httpserver_set_enabled(httpserver, 1);

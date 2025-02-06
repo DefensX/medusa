@@ -2,30 +2,31 @@
 #if !defined(MEDUSA_ERROR_H)
 #define MEDUSA_ERROR_H
 
+#include <stdint.h>
 #include <string.h>
 
 #define MAX_ERRNO       4095
 
-#define MEDUSA_IS_ERR_VALUE(x) ((unsigned long) (void *) (x) >= (unsigned long) -MAX_ERRNO)
+#define MEDUSA_IS_ERR_VALUE(x) ((uintptr_t) (void *) (x) >= (uintptr_t) -MAX_ERRNO)
 
-static inline void * MEDUSA_ERR_PTR (long error)
+static inline void * MEDUSA_ERR_PTR (int error)
 {
-        return (void *) error;
+        return (void *) (intptr_t) error;
 }
 
-static inline long MEDUSA_PTR_ERR (const void *ptr)
+static inline int MEDUSA_PTR_ERR (const void *ptr)
 {
-        return (long) ptr;
+        return (int) (intptr_t) ptr;
 }
 
 static inline int MEDUSA_IS_ERR (const void *ptr)
 {
-        return MEDUSA_IS_ERR_VALUE((unsigned long) ptr);
+        return MEDUSA_IS_ERR_VALUE((uintptr_t) ptr);
 }
 
 static inline int MEDUSA_IS_ERR_OR_NULL (const void *ptr)
 {
-        return (!ptr) || MEDUSA_IS_ERR_VALUE((unsigned long) ptr);
+        return (!ptr) || MEDUSA_IS_ERR_VALUE((uintptr_t) ptr);
 }
 
 static inline char * medusa_strerror (int error)

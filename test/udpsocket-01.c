@@ -28,6 +28,7 @@ static int udpsocket_onevent (struct medusa_udpsocket *udpsocket, unsigned int e
         unsigned int *tevents = (unsigned int *) context;
         (void) udpsocket;
         (void) param;
+        fprintf(stderr, "events: 0x%08x, %s\n", events, medusa_udpsocket_event_string(events));
         *tevents |= events;
         return 0;
 }
@@ -99,7 +100,8 @@ static int test_poll (unsigned int poll)
         if (tevents != (MEDUSA_UDPSOCKET_EVENT_BINDING |
                         MEDUSA_UDPSOCKET_EVENT_BOUND |
                         MEDUSA_UDPSOCKET_EVENT_LISTENING |
-                        MEDUSA_UDPSOCKET_EVENT_DESTROY)) {
+                        MEDUSA_UDPSOCKET_EVENT_DESTROY |
+                        MEDUSA_UDPSOCKET_EVENT_STATE_CHANGED)) {
                 fprintf(stderr, "tevents: 0x%08x is invalid\n", tevents);
                 goto bail;
         }

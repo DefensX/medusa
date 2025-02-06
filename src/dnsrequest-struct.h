@@ -5,13 +5,18 @@
 struct medusa_dnsrequest {
         struct medusa_subject subject;
         unsigned int state;
+        unsigned int error;
         int (*onevent) (struct medusa_dnsrequest *dnsrequest, unsigned int events, void *context, void *param);
         void *context;
+        double resolve_timeout;
         double connect_timeout;
         double receive_timeout;
         char *nameserver;
+        int port;
+        unsigned int code;
         unsigned int type;
         char *name;
+        int id;
         void *userdata;
         struct medusa_udpsocket *udpsocket;
         struct medusa_dnsrequest_reply *reply;

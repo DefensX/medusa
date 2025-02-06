@@ -62,6 +62,8 @@ unsigned int medusa_signal_get_userdata_uint (struct medusa_signal *signal);
 
 struct medusa_monitor * medusa_signal_get_monitor (const struct medusa_signal *signal);
 
+const char * medusa_signal_event_string (unsigned int event);
+
 #ifdef __cplusplus
 }
 #endif

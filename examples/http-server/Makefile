@@ -22,6 +22,11 @@ medusa-http-server_ldflags-${MEDUSA_TCPSOCKET_OPENSSL_ENABLE} += \
 	-lssl \
 	-lcrypto
 
+medusa-http-server_ldflags-${__WINDOWS__} += \
+	-lws2_32 \
+	-lcrypt32 \
+	-static
+
 medusa-http-server_ldflags-$(__LINUX__) += \
 	-lrt
 
@@ -33,4 +38,4 @@ dist.dir = ../../dist
 dist.bin-y = \
 	medusa-http-server
 
-include ../../Makefile.lib
+include ../../3rdparty/libmakefile/Makefile.lib

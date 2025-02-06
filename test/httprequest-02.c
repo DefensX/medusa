@@ -62,12 +62,12 @@ static int test_poll (unsigned int poll)
                 fprintf(stderr, "medusa_httprequest_add_header failed\n");
                 goto bail;
         }
-        rc = medusa_httprequest_add_header(httprequest, "key", "%s", "value");
+        rc = medusa_httprequest_add_headerf(httprequest, "key", "%s", "value");
         if (rc < 0) {
                 fprintf(stderr, "medusa_httprequest_add_header failed\n");
                 goto bail;
         }
-        rc = medusa_httprequest_add_header(httprequest, "key", "%s.%d", "value", 0);
+        rc = medusa_httprequest_add_headerf(httprequest, "key", "%s.%d", "value", 0);
         if (rc < 0) {
                 fprintf(stderr, "medusa_httprequest_add_header failed\n");
                 goto bail;

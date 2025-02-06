@@ -47,7 +47,7 @@ static void medusa_sha1_transform (uint32_t state[5], const uint8_t buffer[64])
 
         CHAR64LONG16 block[1];
         memcpy(block, buffer, 64);
-    
+
         a = state[0];
         b = state[1];
         c = state[2];
@@ -187,7 +187,7 @@ __attribute__ ((visibility ("default"))) void medusa_sha1_final (uint8_t digest[
         for (i = 0; i < 8; i++) {
                 finalcount[i] = (uint8_t) ((context->count[(i >= 4 ? 0 : 1)] >> ((3 - (i & 3)) * 8)) & 255); /* Endian independent */
         }
-    
+
         c = 0200;
         medusa_sha1_update(context, &c, 1);
         while ((context->count[0] & 504) != 448) {
@@ -209,5 +209,4 @@ __attribute__ ((visibility ("default"))) void medusa_sha1 (char hash_out[MEDUSA_
                 medusa_sha1_update(&ctx, (const uint8_t *) str + i, 1);
         }
         medusa_sha1_final((uint8_t *) hash_out, &ctx);
-        hash_out[MEDUSA_SHA1_LENGTH] = '\0';
 }

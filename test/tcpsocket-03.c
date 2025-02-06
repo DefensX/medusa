@@ -161,12 +161,12 @@ static int test_poll (unsigned int poll)
         fprintf(stderr, "port: %d\n", port);
 
 #if defined(MEDUSA_TEST_TCPSOCKET_SSL) && (MEDUSA_TEST_TCPSOCKET_SSL == 1)
-        rc = medusa_tcpsocket_set_ssl_certificate(tcpsocket, "tcpsocket-ssl.crt");
+        rc = medusa_tcpsocket_set_ssl_certificate_file(tcpsocket, "tcpsocket-ssl.crt");
         if (rc < 0) {
                 fprintf(stderr, "medusa_tcpsocket_set_ssl_certificate failed\n");
                 goto bail;
         }
-        rc = medusa_tcpsocket_set_ssl_privatekey(tcpsocket, "tcpsocket-ssl.key");
+        rc = medusa_tcpsocket_set_ssl_privatekey_file(tcpsocket, "tcpsocket-ssl.key");
         if (rc < 0) {
                 fprintf(stderr, "medusa_tcpsocket_set_ssl_privatekey failed\n");
                 goto bail;

@@ -8,6 +8,9 @@
 
 #include <pthread.h>
 
+#define MEDUSA_DEBUG_NAME       "io"
+
+#include "debug.h"
 #include "error.h"
 #include "pool.h"
 #include "queue.h"
@@ -59,12 +62,6 @@ static inline void io_del_events (struct medusa_io *io, unsigned int events)
 static inline unsigned int io_get_events (const struct medusa_io *io)
 {
         return (io->flags >> MEDUSA_IO_EVENT_SHIFT) & MEDUSA_IO_EVENT_MASK;
-}
-
-static inline void io_set_flag (struct medusa_io *io, unsigned int flag)
-{
-        io->flags = (io->flags & ~(MEDUSA_IO_FLAG_MASK << MEDUSA_IO_FLAG_SHIFT)) |
-                           ((flag & MEDUSA_IO_FLAG_MASK) << MEDUSA_IO_FLAG_SHIFT);
 }
 
 static inline void io_add_flag (struct medusa_io *io, unsigned int flag)
@@ -628,6 +625,9 @@ __attribute__ ((visibility ("default"))) int medusa_io_onevent_unlocked (struct 
                     (events & MEDUSA_IO_EVENT_DESTROY)) {
                         medusa_monitor_unlock(monitor);
                         rc = io->onevent(io, events, io->context, param);
+                        if (rc < 0) {
+                                medusa_errorf("io->onevent failed, ret: %d", rc);
+                        }
                         medusa_monitor_lock(monitor);
                 }
         }

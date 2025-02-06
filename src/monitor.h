@@ -2,6 +2,11 @@
 #if !defined(MEDUSA_MONITOR_H)
 #define MEDUSA_MONITOR_H
 
+#ifdef __cplusplus
+extern "C"
+{
+#endif
+
 struct medusa_monitor;
 
 enum {
@@ -19,16 +24,20 @@ enum {
 
 enum {
         MEDUSA_MONITOR_TIMER_DEFAULT,
-        MEDUSA_MONITOR_TIMER_TIMERFD
+        MEDUSA_MONITOR_TIMER_TIMERFD,
+        MEDUSA_MONITOR_TIMER_MONOTONIC
 #define MEDUSA_MONITOR_TIMER_DEFAULT    MEDUSA_MONITOR_TIMER_DEFAULT
 #define MEDUSA_MONITOR_TIMER_TIMERFD    MEDUSA_MONITOR_TIMER_TIMERFD
+#define MEDUSA_MONITOR_TIMER_MONOTONIC  MEDUSA_MONITOR_TIMER_MONOTONIC
 };
 
 enum {
         MEDUSA_MONITOR_SIGNAL_DEFAULT,
-        MEDUSA_MONITOR_SIGNAL_SIGACTION
+        MEDUSA_MONITOR_SIGNAL_SIGACTION,
+        MEDUSA_MONITOR_SIGNAL_NULL
 #define MEDUSA_MONITOR_SIGNAL_DEFAULT   MEDUSA_MONITOR_SIGNAL_DEFAULT
 #define MEDUSA_MONITOR_SIGNAL_SIGACTION MEDUSA_MONITOR_SIGNAL_SIGACTION
+#define MEDUSA_MONITOR_SIGNAL_NULL      MEDUSA_MONITOR_SIGNAL_NULL
 };
 
 enum {
@@ -53,16 +62,16 @@ struct medusa_monitor_init_options {
                 unsigned int type;
                 union {
                         struct {
-
+                                int foo;
                         } epoll;
                         struct {
-
+                                int foo;
                         } kqueue;
                         struct {
-
+                                int foo;
                         } poll;
                         struct {
-
+                                int foo;
                         } select;
                 } u;
         } poll;
@@ -70,7 +79,7 @@ struct medusa_monitor_init_options {
                 unsigned int type;
                 union {
                         struct {
-
+                                int foo;
                         } timerfd;
                 } u;
         } timer;
@@ -78,7 +87,7 @@ struct medusa_monitor_init_options {
                 unsigned int type;
                 union {
                         struct {
-
+                                int foo;
                         } sigaction;
                 } u;
         } signal;
@@ -88,10 +97,23 @@ struct medusa_monitor_init_options {
         } onevent;
 };
 
-#ifdef __cplusplus
-extern "C"
-{
-#endif
+enum {
+        MEDUSA_MONITOR_ERROR_TYPE_UNKNOWN               = 0,
+        MEDUSA_MONITOR_ERROR_TYPE_SUBJECT_ONEVENT       = 1
+#define MEDUSA_MONITOR_ERROR_TYPE_UNKNOWN               MEDUSA_MONITOR_ERROR_TYPE_UNKNOWN
+#define MEDUSA_MONITOR_ERROR_TYPE_SUBJECT_ONEVENT       MEDUSA_MONITOR_ERROR_TYPE_SUBJECT_ONEVENT
+};
+
+struct medusa_monitor_event_error_subject_onevent {
+        unsigned int subject_type;
+};
+
+struct medusa_monitor_event_error {
+        unsigned int type;
+        union {
+                struct medusa_monitor_event_error_subject_onevent subject_onevent;
+        } u;
+};
 
 int medusa_monitor_init_options_default (struct medusa_monitor_init_options *options);
 
@@ -107,6 +129,8 @@ int medusa_monitor_get_running (struct medusa_monitor *monitor);
 
 int medusa_monitor_break (struct medusa_monitor *monitor);
 int medusa_monitor_continue (struct medusa_monitor *monitor);
+
+const char * medusa_monitor_event_string (unsigned int event);
 
 #ifdef __cplusplus
 }

@@ -36,6 +36,11 @@ define test-defaults
 	$1_ldflags-$(__LINUX__) += \
 		-lrt
 
+	$1_ldflags-${__WINDOWS__} += \
+		-lws2_32 \
+		-lcrypt32 \
+		-static
+
 	$1_depends-y = \
 		../dist/lib/libmedusa.a
 endef
@@ -57,7 +62,7 @@ endef
 $(eval $(foreach T,${tests},$(eval $(call test-defaults,$T))))
 $(eval $(foreach T,${tests_event},$(eval $(call test_event-defaults,$T))))
 
-include ../Makefile.lib
+include ../3rdparty/libmakefile/Makefile.lib
 
 tests: all
 	${Q}echo "running tests";

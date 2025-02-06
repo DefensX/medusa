@@ -76,8 +76,38 @@ enum {
 
 struct medusa_httprequest_init_options {
         struct medusa_monitor *monitor;
+        struct medusa_dnsresolver *dnsresolver;
+        double resolve_timeout;
+        double connect_timeout;
+        double read_timeout;
+        const char *method;
+        const char *url;
         int (*onevent) (struct medusa_httprequest *httprequest, unsigned int events, void *context, void *param);
         void *context;
+};
+
+enum {
+        MEDUSA_HTTPREQUEST_ERROR_REASON_PARSER          = 0,
+        MEDUSA_HTTPREQUEST_ERROR_REASON_TCPSOCKET       = 1
+#define MEDUSA_HTTPREQUEST_ERROR_REASON_PARSER          MEDUSA_HTTPREQUEST_ERROR_REASON_PARSER
+#define MEDUSA_HTTPREQUEST_ERROR_REASON_TCPSOCKET       MEDUSA_HTTPREQUEST_ERROR_REASON_TCPSOCKET
+};
+
+struct medusa_httprequest_event_error {
+        unsigned int state;
+        unsigned int error;
+        unsigned int line;
+        unsigned int reason;
+        union {
+                struct {
+                        unsigned int state;
+                        unsigned int error;
+                        unsigned int line;
+                } tcpsocket;
+                struct {
+                        unsigned int error;
+                } parser;
+        } u;
 };
 
 #ifdef __cplusplus
@@ -93,6 +123,9 @@ void medusa_httprequest_destroy (struct medusa_httprequest *httprequest);
 
 unsigned int medusa_httprequest_get_state (const struct medusa_httprequest *httprequest);
 
+int medusa_httprequest_set_resolve_timeout (struct medusa_httprequest *httprequest, double timeout);
+double medusa_httprequest_get_resolve_timeout (const struct medusa_httprequest *httprequest);
+
 int medusa_httprequest_set_connect_timeout (struct medusa_httprequest *httprequest, double timeout);
 double medusa_httprequest_get_connect_timeout (const struct medusa_httprequest *httprequest);
 
@@ -101,13 +134,45 @@ double medusa_httprequest_get_read_timeout (const struct medusa_httprequest *htt
 
 int medusa_httprequest_set_method (struct medusa_httprequest *httprequest, const char *method);
 
-int medusa_httprequest_add_header (struct medusa_httprequest *httprequest, const char *key, const char *value, ...) __attribute__((format(printf, 3, 4)));
-int medusa_httprequest_add_vheader (struct medusa_httprequest *httprequest, const char *key, const char *value, va_list va);
+int medusa_httprequest_set_url (struct medusa_httprequest *httprequest, const char *url, ...) __attribute__((format(printf, 2, 3)));
+int medusa_httprequest_set_vurl (struct medusa_httprequest *httprequest, const char *url, va_list va);
+const char * medusa_httprequest_get_url (const struct medusa_httprequest *httprequest);
 
-int medusa_httprequest_make_post (struct medusa_httprequest *httprequest, const char *url, const void *data, int64_t length);
-int medusa_httprequest_make_post_string (struct medusa_httprequest *httprequest, const char *url, const char *data);
+int medusa_httprequest_add_header (struct medusa_httprequest *httprequest, const char *key, const char *value);
+int medusa_httprequest_add_headerf (struct medusa_httprequest *httprequest, const char *key, const char *value, ...) __attribute__((format(printf, 3, 4)));
+int medusa_httprequest_add_headerv (struct medusa_httprequest *httprequest, const char *key, const char *value, va_list va);
+
+int medusa_httprequest_add_raw_header (struct medusa_httprequest *httprequest, const char *value);
+int medusa_httprequest_add_raw_headerf (struct medusa_httprequest *httprequest, const char *value, ...) __attribute__((format(printf, 2, 3)));
+int medusa_httprequest_add_raw_headerv (struct medusa_httprequest *httprequest, const char *value, va_list va);
+
+int medusa_httprequest_make_request (struct medusa_httprequest *httprequest, const void *data, int64_t length);
+int medusa_httprequest_make_requestf (struct medusa_httprequest *httprequest, const char *data, ...) __attribute__((format(printf, 2, 3)));
+int medusa_httprequest_make_requestv (struct medusa_httprequest *httprequest, const char *data, va_list va);
+
+int medusa_httprequest_make_get (struct medusa_httprequest *httprequest);
+
+int medusa_httprequest_make_post (struct medusa_httprequest *httprequest, const void *data, int64_t length);
+int medusa_httprequest_make_postf (struct medusa_httprequest *httprequest, const char *data, ...) __attribute__((format(printf, 2, 3)));
+int medusa_httprequest_make_postv (struct medusa_httprequest *httprequest, const char *data, va_list va);
 
 int medusa_httprequest_onevent (struct medusa_httprequest *httprequest, unsigned int events, void *param);
+
+int medusa_httprequest_set_context (struct medusa_httprequest *httprequest, void *context);
+void * medusa_httprequest_get_context (struct medusa_httprequest *httprequest);
+
+int medusa_httprequest_set_userdata (struct medusa_httprequest *httprequest, void *userdata);
+void * medusa_httprequest_get_userdata (struct medusa_httprequest *httprequest);
+
+int medusa_httprequest_set_userdata_ptr (struct medusa_httprequest *httprequest, void *userdata);
+void * medusa_httprequest_get_userdata_ptr (struct medusa_httprequest *httprequest);
+
+int medusa_httprequest_set_userdata_int (struct medusa_httprequest *httprequest, int userdara);
+int medusa_httprequest_get_userdata_int (struct medusa_httprequest *httprequest);
+
+int medusa_httprequest_set_userdata_uint (struct medusa_httprequest *httprequest, unsigned int userdata);
+unsigned int medusa_httprequest_get_userdata_uint (struct medusa_httprequest *httprequest);
+
 struct medusa_monitor * medusa_httprequest_get_monitor (struct medusa_httprequest *httprequest);
 
 const struct medusa_httprequest_reply * medusa_httprequest_get_reply (const struct medusa_httprequest *httprequest);

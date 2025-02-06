@@ -6,7 +6,10 @@
 #include <string.h>
 #include <errno.h>
 
+#define MEDUSA_DEBUG_NAME       "condition"
+
 #include "clock.h"
+#include "debug.h"
 #include "error.h"
 #include "pool.h"
 #include "queue.h"
@@ -480,9 +483,9 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_conditio
 
 __attribute__ ((visibility ("default"))) int medusa_condition_onevent_unlocked (struct medusa_condition *condition, unsigned int events, void *param)
 {
-        int rc;
+        int ret;
         struct medusa_monitor *monitor;
-        rc = 0;
+        ret = 0;
         monitor = condition->subject.monitor;
         if (events & MEDUSA_CONDITION_EVENT_SIGNAL) {
                 condition_set_signalled(condition, 0);
@@ -491,7 +494,10 @@ __attribute__ ((visibility ("default"))) int medusa_condition_onevent_unlocked (
                 if ((medusa_subject_is_active(&condition->subject)) ||
                     (events & MEDUSA_CONDITION_EVENT_DESTROY)) {
                         medusa_monitor_unlock(monitor);
-                        rc = condition->onevent(condition, events, condition->context, param);
+                        ret = condition->onevent(condition, events, condition->context, param);
+                        if (ret < 0) {
+                                medusa_errorf("condition->onevent failed, rc: %d", ret);
+                        }
                         medusa_monitor_lock(monitor);
                 }
         }
@@ -502,7 +508,7 @@ __attribute__ ((visibility ("default"))) int medusa_condition_onevent_unlocked (
                 free(condition);
 #endif
         }
-        return rc;
+        return ret;
 }
 
 __attribute__ ((visibility ("default"))) int medusa_condition_is_valid_unlocked (const struct medusa_condition *condition)

@@ -2,25 +2,25 @@
 #if !defined(MEDUSA_PQUEUE_H)
 #define MEDUSA_PQUEUE_H
 
-struct pqueue_head;
+struct medusa_pqueue_head;
 
-struct pqueue_head * pqueue_create (
+struct medusa_pqueue_head * medusa_pqueue_create (
         unsigned int size, unsigned int step,
         int (*compare) (void *a, void *b),
         void (*setpos) (void *entry, unsigned int position),
         unsigned int (*getpos) (void *entry));
-void pqueue_destroy (struct pqueue_head *head);
+void medusa_pqueue_destroy (struct medusa_pqueue_head *head);
 
-unsigned int pqueue_count (struct pqueue_head *head);
+unsigned int medusa_pqueue_count (struct medusa_pqueue_head *head);
 
-int pqueue_add (struct pqueue_head *head, void *entry);
-int pqueue_mod (struct pqueue_head *head, void *entry, int compare);
-int pqueue_del (struct pqueue_head *head, void *entry);
-int pqueue_verify (struct pqueue_head *head);
+int medusa_pqueue_add (struct medusa_pqueue_head *head, void *entry);
+int medusa_pqueue_mod (struct medusa_pqueue_head *head, void *entry, int compare);
+int medusa_pqueue_del (struct medusa_pqueue_head *head, void *entry);
+int medusa_pqueue_verify (struct medusa_pqueue_head *head);
 
-void * pqueue_peek (struct pqueue_head *head);
-void * pqueue_pop (struct pqueue_head *head);
-int pqueue_search (struct pqueue_head *head, void *key, int (*callback) (void *context, void *entry), void *context);
-int pqueue_traverse (struct pqueue_head *head, int (*callback) (void *context, void *entry), void *context);
+void * medusa_pqueue_peek (struct medusa_pqueue_head *head);
+void * medusa_pqueue_pop (struct medusa_pqueue_head *head);
+int medusa_pqueue_search (struct medusa_pqueue_head *head, void *key, int (*callback) (void *context, void *entry), void *context);
+int medusa_pqueue_traverse (struct medusa_pqueue_head *head, int (*callback) (void *context, void *entry), void *context);
 
 #endif

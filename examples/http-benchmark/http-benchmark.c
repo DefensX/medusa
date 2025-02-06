@@ -6,20 +6,26 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <time.h>
-
-#include <sys/queue.h>
-
 #include <fcntl.h>
+
+#if defined(__WINDOWS__)
+#include <winsock2.h>
+#include <wspiapi.h>
+#else
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
-
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/tcp.h>
+#endif
+
 #include <errno.h>
 
 #include <medusa/error.h>
+#include <medusa/clock.h>
+#include <medusa/queue.h>
+#include <medusa/strndup.h>
 #include <medusa/io.h>
 #include <medusa/monitor.h>
 
@@ -179,21 +185,19 @@ static int client_io_onevent (struct medusa_io *io, unsigned int events, void *c
 
 static unsigned long clock_get (void)
 {
-#if defined(CLOCK_MONOTONIC_RAW)
+        int rc;
         struct timespec ts;
         unsigned long long tsec;
         unsigned long long tusec;
         unsigned long long _clock;
-        if (clock_gettime(CLOCK_MONOTONIC_RAW, &ts) < 0) {
+        rc = medusa_clock_monotonic_raw(&ts);
+        if (rc < 0) {
                 return 0;
         }
         tsec = ((unsigned long long) ts.tv_sec) * 1000;
         tusec = ((unsigned long long) ts.tv_nsec) / 1000 / 1000;
         _clock = tsec + tusec;
         return _clock;
-#else
-        #error "clock is invalid"
-#endif
 }
 
 static int clock_after (unsigned long a, unsigned long b)
@@ -406,7 +410,7 @@ static struct url * url_create (const char *uri)
         }
         i = strstr(u, "://");
         if (i != NULL) {
-                url->scheme = strndup(u, i - u);
+                url->scheme = medusa_strndup(u, i - u);
                 i += 3;
         } else {
                 i = u;
@@ -420,21 +424,21 @@ static struct url * url_create (const char *uri)
                 url->host = strdup(i);
         } else if (p != NULL && e == NULL) {
                 url->port = atoi(p + 1);
-                url->host = strndup(i, p - i);
+                url->host = medusa_strndup(i, p - i);
         } else if (p == NULL || e < p) {
                 url->port = 0;
                 if (e == NULL) {
                         url->host = strdup(i);
                 } else {
                         *e = '\0';
-                        url->host = strndup(i, e - i);
+                        url->host = medusa_strndup(i, e - i);
                 }
         } else {
                 if (e != NULL) {
                         *e = '\0';
                 }
                 url->port = atoi(p + 1);
-                url->host = strndup(i, p - i);
+                url->host = medusa_strndup(i, p - i);
         }
         if (e != NULL) {
                 do {
@@ -600,7 +604,7 @@ static int client_get_fd_error (struct client *client)
         if (client->io == NULL) {
                 return -EINVAL;
         }
-        rc = getsockopt(medusa_io_get_fd(client->io), SOL_SOCKET, SO_ERROR, &error, &len);
+        rc = getsockopt(medusa_io_get_fd(client->io), SOL_SOCKET, SO_ERROR, (void *) &error, &len);
         if (rc != 0) {
                 return -EINVAL;
         }
@@ -630,7 +634,6 @@ static int client_connect (struct medusa_monitor *monitor, struct client *client
 {
         int rc;
         int fd;
-        int flags;
         struct sockaddr_in sin;
         fd = -1;
         if (client == NULL) {
@@ -657,6 +660,11 @@ again:
                 rc = -EIO;
                 goto bail;
         }
+#if defined(__WINDOWS__)
+        unsigned long nonblocking = 1;
+        rc = ioctlsocket(fd, FIONBIO, &nonblocking);
+#else
+        int flags;
         flags = fcntl(fd, F_GETFL, 0);
         if (flags < 0) {
                 errorf("can not get flags");
@@ -665,6 +673,7 @@ again:
         }
         flags = flags | O_NONBLOCK;
         rc = fcntl(fd, F_SETFL, flags);
+#endif
         if (rc != 0) {
                 errorf("can not set flags");
                 rc = -EIO;
@@ -677,7 +686,6 @@ again:
                 goto bail;
         }
         if (1) {
-                int opt = 1;
                 struct port *lport;
                 struct sockaddr_in laddr;
                 memset(&laddr, 0, sizeof(laddr));
@@ -691,11 +699,14 @@ again:
                                 goto bail;
                         }
                         laddr.sin_port = htons(lport->port);
+#if defined(SO_REUSEPORT)
+                        int opt = 1;
                         rc = setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt));
                         if (rc < 0) {
                                 errorf("setsockopt reuseport failed");
                                 goto bail;
                         }
+#endif
                         rc = bind(fd, (struct sockaddr*) &laddr, sizeof(laddr));
                         if (rc != 0) {
                                 errorf("can not bind to port: %d, error: %d, %s", lport->port, errno, strerror(errno));
@@ -1294,6 +1305,7 @@ int main (int argc, char *argv[])
 out:    TAILQ_FOREACH_SAFE(client, &clients, clients, nclient) {
                 TAILQ_REMOVE(&clients, client, clients);
                 client_destroy(client);
+                nclients = nclients - 1;
         }
         TAILQ_FOREACH_SAFE(port, &ports, ports, nport) {
                 TAILQ_REMOVE(&ports, port, ports);

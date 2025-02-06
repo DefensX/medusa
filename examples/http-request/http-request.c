@@ -5,6 +5,10 @@
 #include <stdarg.h>
 #include <getopt.h>
 
+#if defined(__WINDOWS__)
+#include <winsock2.h>
+#endif
+
 #include <medusa/error.h>
 #include <medusa/httprequest.h>
 #include <medusa/monitor.h>
@@ -47,7 +51,7 @@ static void usage (const char *pname)
         fprintf(stdout, "  -e, --header: add header\n");
         fprintf(stdout, "  -d, --data  : request data (default: %s)\n", (OPTIONS_DEFAULT_DATA) ? OPTIONS_DEFAULT_DATA : "(null)");
         fprintf(stdout, "  -c, --connect-timeout: connect timeout (default: %.2f)\n", OPTIONS_DEFAULT_CONNECT_TIMEOUT);
-        fprintf(stdout, "  -c, --read-timeout   : read timeout (default: %.2f)\n", OPTIONS_DEFAULT_READ_TIMEOUT);
+        fprintf(stdout, "  -r, --read-timeout   : read timeout (default: %.2f)\n", OPTIONS_DEFAULT_READ_TIMEOUT);
         fprintf(stdout, "  -h, --help  : this text\n");
         fprintf(stdout, "\n");
         fprintf(stdout, "example:\n");
@@ -63,6 +67,8 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
         (void) context;
         (void) param;
         fprintf(stderr, "httprequest state: %d, %s events: 0x%08x, %s\n", medusa_httprequest_get_state(httprequest), medusa_httprequest_state_string(medusa_httprequest_get_state(httprequest)), events, medusa_httprequest_event_string(events));
+        if (events & MEDUSA_HTTPREQUEST_EVENT_REQUESTED) {
+        }
         if (events & MEDUSA_HTTPREQUEST_EVENT_RECEIVED) {
                 const struct medusa_httprequest_reply *httprequest_reply;
                 const struct medusa_httprequest_reply_status *httprequest_reply_status;
@@ -82,7 +88,7 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
                         goto bail;
                 }
                 fprintf(stderr, "status:\n");
-                fprintf(stderr, "  code : %ld\n", medusa_httprequest_reply_status_get_code(httprequest_reply_status));
+                fprintf(stderr, "  code : %lld\n", (long long int) medusa_httprequest_reply_status_get_code(httprequest_reply_status));
                 fprintf(stderr, "  value: %s\n", medusa_httprequest_reply_status_get_value(httprequest_reply_status));
 
                 httprequest_reply_headers = medusa_httprequest_reply_get_headers(httprequest_reply);
@@ -91,7 +97,7 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
                         goto bail;
                 }
                 fprintf(stderr, "headers:\n");
-                fprintf(stderr, "  count: %ld\n", medusa_httprequest_reply_headers_get_count(httprequest_reply_headers));
+                fprintf(stderr, "  count: %lld\n", (long long int) medusa_httprequest_reply_headers_get_count(httprequest_reply_headers));
                 for (httprequest_reply_header = medusa_httprequest_reply_headers_get_first(httprequest_reply_headers);
                      httprequest_reply_header;
                      httprequest_reply_header = medusa_httprequest_reply_header_get_next(httprequest_reply_header)) {
@@ -106,7 +112,7 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
                         goto bail;
                 }
                 fprintf(stderr, "body\n");
-                fprintf(stderr, "  length: %ld\n", medusa_httprequest_reply_body_get_length(httprequest_reply_body));
+                fprintf(stderr, "  length: %lld\n", (long long int) medusa_httprequest_reply_body_get_length(httprequest_reply_body));
                 fprintf(stderr, "  value : %.*s\n",
                         (int) medusa_httprequest_reply_body_get_length(httprequest_reply_body),
                         (char *) medusa_httprequest_reply_body_get_value(httprequest_reply_body));
@@ -137,7 +143,6 @@ int main (int argc, char *argv[])
 
         const char *option_url;
         const char *option_method;
-        const char *option_header;
         const char *option_data;
         double option_connect_timeout;
         double option_read_timeout;
@@ -148,14 +153,15 @@ int main (int argc, char *argv[])
         struct medusa_httprequest_init_options httprequest_init_options;
         struct medusa_httprequest *httprequest;
 
-        (void) option_header;
-        (void) option_method;
+#if defined(__WINDOWS__)
+        WSADATA wsaData;
+        WSAStartup(MAKEWORD(2,2), &wsaData);
+#endif
 
         monitor = NULL;
 
         option_url             = OPTIONS_DEFAULT_URL;
         option_method          = OPTIONS_DEFAULT_METHOD;
-        option_header          = NULL;
         option_data            = NULL;
         option_connect_timeout = OPTIONS_DEFAULT_CONNECT_TIMEOUT;
         option_read_timeout    = OPTIONS_DEFAULT_READ_TIMEOUT;
@@ -178,7 +184,6 @@ int main (int argc, char *argv[])
                                 option_method = optarg;
                                 break;
                         case OPTION_HEADER:
-                                option_header = optarg;
                                 break;
                         case OPTION_DATA:
                                 option_data = optarg;
@@ -226,6 +231,11 @@ int main (int argc, char *argv[])
                 fprintf(stderr, "can not set httprequest method\n");
                 goto bail;
         }
+        rc = medusa_httprequest_set_url(httprequest, "%s", option_url);
+        if (rc != 0) {
+                fprintf(stderr, "can not set httprequest url\n");
+                goto bail;
+        }
 
         optind = 0;
         for (_argc = 0; _argc < argc; _argc++) {
@@ -234,13 +244,12 @@ int main (int argc, char *argv[])
         while ((c = getopt_long(_argc, _argv, ":e:", longopts, NULL)) != -1) {
                 switch (c) {
                         case OPTION_HEADER:
-                                option_header = optarg;
                                 rc = medusa_httprequest_add_header(httprequest, optarg, NULL);
                                 break;
                 }
         }
 
-        rc = medusa_httprequest_make_post(httprequest, option_url, option_data, (option_data) ? (strlen(option_data) + 1) : 0);
+        rc = medusa_httprequest_make_request(httprequest, option_data, (option_data) ? (strlen(option_data) + 1) : 0);
         if (rc < 0) {
                 fprintf(stderr, "can not make post\n");
                 goto bail;

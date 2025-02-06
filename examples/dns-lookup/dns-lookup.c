@@ -8,7 +8,9 @@
 #include <signal.h>
 #include <errno.h>
 
-#include <sys/uio.h>
+#if defined(__WINDOWS__)
+#include <winsock2.h>
+#endif
 
 #include "medusa/error.h"
 #include "medusa/dnsrequest.h"
@@ -18,16 +20,22 @@
 static int g_running;
 
 #define OPTION_NAMESERVER_DEFAULT       "8.8.8.8"
+#define OPTION_PORT_DEFAULT             53
+#define OPTION_CODE_DEFAULT             "query"
 #define OPTION_TYPE_DEFAULT             "A"
 #define OPTION_NAME_DEFAULT             "www.google.com"
 
 #define OPTION_HELP                     'h'
 #define OPTION_NAMESERVER               's'
+#define OPTION_PORT                     'p'
+#define OPTION_CODE                     'c'
 #define OPTION_TYPE                     't'
 #define OPTION_NAME                     'n'
 static struct option longopts[] = {
         { "help",                       no_argument,            NULL,   OPTION_HELP             },
         { "nameserver",                 required_argument,      NULL,   OPTION_NAMESERVER       },
+        { "port",                       required_argument,      NULL,   OPTION_PORT             },
+        { "code",                       required_argument,      NULL,   OPTION_CODE             },
         { "type",                       required_argument,      NULL,   OPTION_TYPE             },
         { "name",                       required_argument,      NULL,   OPTION_NAME             },
         { NULL,                         0,                      NULL,   0                       },
@@ -36,10 +44,12 @@ static struct option longopts[] = {
 static void usage (const char *pname)
 {
         fprintf(stdout, "usage: %s [-s nameserver] [-t type] -n name:\n", pname);
-        fprintf(stdout, "  -h. --help      : this text\n");
+        fprintf(stdout, "  -h, --help      : this text\n");
         fprintf(stdout, "  -s, --nameserver: nameserver address (default: %s)\n", OPTION_NAMESERVER_DEFAULT);
-        fprintf(stdout, "  -t. --type      : record type (default: %s)\n", OPTION_TYPE_DEFAULT);
-        fprintf(stdout, "  -n. --name      : nameto lookup (default: %s)\n", OPTION_NAME_DEFAULT);
+        fprintf(stdout, "  -p, --port      : nameserver port (default: %d)\n", OPTION_PORT_DEFAULT);
+        fprintf(stdout, "  -c, --code      : op code (default: %s)\n", OPTION_CODE_DEFAULT);
+        fprintf(stdout, "  -t, --type      : record type (default: %s)\n", OPTION_TYPE_DEFAULT);
+        fprintf(stdout, "  -n, --name      : nameto lookup (default: %s)\n", OPTION_NAME_DEFAULT);
 }
 
 static int dnsrequest_onevent (struct medusa_dnsrequest *dnsrequest, unsigned int events, void *context, void *param)
@@ -176,6 +186,8 @@ int main (int argc, char *argv[])
 
         int c;
         const char *option_nameserver;
+        int option_port;
+        const char *option_code;
         const char *option_type;
         const char *option_name;
 
@@ -187,25 +199,35 @@ int main (int argc, char *argv[])
         struct medusa_monitor *medusa_monitor;
         struct medusa_monitor_init_options medusa_monitor_init_options;
 
-        (void) argc;
-        (void) argv;
+#if defined(__WINDOWS__)
+        WSADATA wsaData;
+        WSAStartup(MAKEWORD(2,2), &wsaData);
+#endif
 
         err = 0;
         medusa_monitor = NULL;
 
         option_nameserver       = OPTION_NAMESERVER_DEFAULT;
+        option_port             = OPTION_PORT_DEFAULT;
+        option_code             = OPTION_CODE_DEFAULT;
         option_type             = OPTION_TYPE_DEFAULT;
         option_name             = OPTION_NAME_DEFAULT;
 
         g_running = 1;
 
-        while ((c = getopt_long(argc, argv, "hs:t:n:", longopts, NULL)) != -1) {
+        while ((c = getopt_long(argc, argv, "hs:p:c:t:n:", longopts, NULL)) != -1) {
                 switch (c) {
                         case OPTION_HELP:
                                 usage(argv[0]);
                                 goto out;
                         case OPTION_NAMESERVER:
                                 option_nameserver = optarg;
+                                break;
+                        case OPTION_PORT:
+                                option_port = atoi(optarg);
+                                break;
+                        case OPTION_CODE:
+                                option_code = optarg;
                                 break;
                         case OPTION_TYPE:
                                 option_type = optarg;
@@ -233,22 +255,26 @@ int main (int argc, char *argv[])
 
         fprintf(stderr, "dns-lookup\n");
         fprintf(stderr, "  nameserver: %s\n", option_nameserver);
+        fprintf(stderr, "  code      : %s, %d\n", option_code, medusa_dnsrequest_opcode_value(option_code));
         fprintf(stderr, "  type      : %s, %d\n", option_type, medusa_dnsrequest_record_type_value(option_type));
         fprintf(stderr, "  name      : %s\n", option_name);
 
         rc = medusa_monitor_init_options_default(&medusa_monitor_init_options);
         if (rc < 0) {
+                fprintf(stderr, "can not init medusa monitor init default options\n");
                 err = rc;
                 goto out;
         }
         medusa_monitor = medusa_monitor_create_with_options(&medusa_monitor_init_options);
         if (MEDUSA_IS_ERR_OR_NULL(medusa_monitor)) {
+                fprintf(stderr, "can not create medusa monitor: 0x%p\n", medusa_monitor);
                 err = MEDUSA_PTR_ERR(medusa_monitor);
                 goto out;
         }
 
         rc = medusa_signal_init_options_default(&medusa_signal_init_options);
         if (rc < 0) {
+                fprintf(stderr, "can not init medusa signal init default options\n");
                 err = rc;
                 goto out;
         }
@@ -260,18 +286,50 @@ int main (int argc, char *argv[])
         medusa_signal_init_options.singleshot  = 0;
         medusa_signal = medusa_signal_create_with_options(&medusa_signal_init_options);
         if (MEDUSA_IS_ERR_OR_NULL(medusa_signal)) {
+                fprintf(stderr, "can not create medusa signal\n");
                 err = MEDUSA_PTR_ERR(medusa_signal);
                 goto out;
         }
 
-        medusa_dnsrequest = medusa_dnsrequest_create_lookup(medusa_monitor, option_nameserver, medusa_dnsrequest_record_type_value(option_type), option_name, dnsrequest_onevent, NULL);
+        medusa_dnsrequest = medusa_dnsrequest_create(medusa_monitor, dnsrequest_onevent, NULL);
         if (MEDUSA_IS_ERR_OR_NULL(medusa_dnsrequest)) {
                 err = MEDUSA_PTR_ERR(medusa_dnsrequest);
+                goto out;
+        }
+        rc = medusa_dnsrequest_set_nameserver(medusa_dnsrequest, option_nameserver);
+        if (rc != 0) {
+                err = rc;
+                goto out;
+        }
+        rc = medusa_dnsrequest_set_port(medusa_dnsrequest, option_port);
+        if (rc != 0) {
+                err = rc;
+                goto out;
+        }
+        rc = medusa_dnsrequest_set_code(medusa_dnsrequest, medusa_dnsrequest_opcode_value(option_code));
+        if (rc != 0) {
+                err = rc;
+                goto out;
+        }
+        rc = medusa_dnsrequest_set_type(medusa_dnsrequest, medusa_dnsrequest_record_type_value(option_type));
+        if (rc != 0) {
+                err = rc;
+                goto out;
+        }
+        rc = medusa_dnsrequest_set_name(medusa_dnsrequest, option_name);
+        if (rc != 0) {
+                err = rc;
+                goto out;
+        }
+        rc = medusa_dnsrequest_lookup(medusa_dnsrequest);
+        if (rc != 0) {
+                err = rc;
                 goto out;
         }
 
         while (g_running == 1) {
                 rc = medusa_monitor_run_once(medusa_monitor);
+                fprintf(stderr, "medusa_monitor_run_once: %d\n", rc);
                 if (rc < 0) {
                         err = rc;
                         break;
@@ -286,4 +344,3 @@ out:    if (!MEDUSA_IS_ERR_OR_NULL(medusa_monitor)) {
         }
         return err;
 }
-

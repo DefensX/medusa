@@ -11,8 +11,12 @@ struct medusa_tcpsocket {
         unsigned int error;
         int backlog;
         struct medusa_io *io;
+        struct medusa_tcpsocket_connect_options *coptions;
+        struct medusa_dnsresolver_lookup *clookup;
+        struct medusa_timer *ltimer;
         struct medusa_timer *ctimer;
         struct medusa_timer *rtimer;
+        struct medusa_timer *wtimer;
         struct medusa_buffer *wbuffer;
         struct medusa_buffer *rbuffer;
 #if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
@@ -20,6 +24,7 @@ struct medusa_tcpsocket {
         SSL_CTX *ssl_ctx;
         char *ssl_certificate;
         char *ssl_privatekey;
+        char *ssl_ca_certificate;
         int ssl_wantread;
         int ssl_wantwrite;
         char *ssl_hostname;

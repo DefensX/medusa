@@ -9,6 +9,7 @@
 #include <pthread.h>
 
 #include "error.h"
+#include "pipe.h"
 #include "clock.h"
 #include "queue.h"
 #include "signal.h"
@@ -207,7 +208,7 @@ struct medusa_signal_backend * medusa_signal_sigaction_create (const struct medu
         }
         memset(internal, 0, sizeof(struct internal));
         TAILQ_INIT(&internal->entries);
-        rc = pipe(internal->sfd);
+        rc = medusa_pipe(internal->sfd);
         if (rc < 0) {
                 pthread_mutex_unlock(&g_signal_handler_wakeup_mutex);
                 internal_destroy(&internal->backend);

@@ -243,8 +243,9 @@ static int server_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket, unsigne
                 tcpsocket_accept_options.context     = session;
                 session->tcpsocket = medusa_tcpsocket_accept_with_options(tcpsocket, &tcpsocket_accept_options);
                 if (MEDUSA_IS_ERR_OR_NULL(session->tcpsocket)) {
+                        int err = MEDUSA_PTR_ERR(session->tcpsocket);
                         session_destroy(session);
-                        return MEDUSA_PTR_ERR(session->tcpsocket);
+                        return err;
                 }
                 TAILQ_INSERT_TAIL(&server->sessions, session, list);
         }
@@ -333,12 +334,12 @@ static struct server * server_create (struct medusa_monitor *monitor, const char
         server->port = port;
 
 #if defined(MEDUSA_TEST_TCPSOCKET_SSL) && (MEDUSA_TEST_TCPSOCKET_SSL == 1)
-        rc = medusa_tcpsocket_set_ssl_certificate(server->tcpsocket, "tcpsocket-ssl.crt");
+        rc = medusa_tcpsocket_set_ssl_certificate_file(server->tcpsocket, "tcpsocket-ssl.crt");
         if (rc < 0) {
                 fprintf(stderr, "medusa_tcpsocket_set_ssl_certificate failed\n");
                 goto bail;
         }
-        rc = medusa_tcpsocket_set_ssl_privatekey(server->tcpsocket, "tcpsocket-ssl.key");
+        rc = medusa_tcpsocket_set_ssl_privatekey_file(server->tcpsocket, "tcpsocket-ssl.key");
         if (rc < 0) {
                 fprintf(stderr, "medusa_tcpsocket_set_ssl_privatekey failed\n");
                 goto bail;

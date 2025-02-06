@@ -6,6 +6,7 @@ subdir-y =			\
 	http-benchmark		\
 	http-request		\
 	http-server		\
+	websocket-client	\
 	websocket-server
 
-include ../Makefile.lib
+include ../3rdparty/libmakefile/Makefile.lib

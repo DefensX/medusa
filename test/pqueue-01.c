@@ -46,7 +46,7 @@ int main (int argc, char *argv[])
 
         int p;
         struct entry *entry;
-        struct pqueue_head *pqueue;
+        struct medusa_pqueue_head *pqueue;
 
         long int seed;
 
@@ -70,43 +70,43 @@ int main (int argc, char *argv[])
                 entries[i].pos = -1;
         }
 
-        pqueue = pqueue_create(0, rand() % 64, entry_compare, entry_set_position, entry_get_position);
+        pqueue = medusa_pqueue_create(0, rand() % 64, entry_compare, entry_set_position, entry_get_position);
         if (pqueue == NULL) {
                 return -1;
         }
 
         fprintf(stderr, "add\n");
-        while (pqueue_count(pqueue) != (unsigned int) count) {
+        while (medusa_pqueue_count(pqueue) != (unsigned int) count) {
                 i = rand() % count;
                 if (entries[i].add == 0) {
-                        pqueue_add(pqueue, &entries[i]);
+                        medusa_pqueue_add(pqueue, &entries[i]);
                         entries[i].add = 1;
                         entries[i].del = 0;
                         fprintf(stderr, "  %d = %d\n", i, entries[i].pri);
                 }
         }
-        if (!pqueue_verify(pqueue)) {
+        if (!medusa_pqueue_verify(pqueue)) {
                 fprintf(stderr, "pqueue is invalid\n");
                 return -1;
         }
 
         fprintf(stderr, "del\n");
-        while (pqueue_count(pqueue) > (unsigned int) count / 2) {
+        while (medusa_pqueue_count(pqueue) > (unsigned int) count / 2) {
                 i = rand() % count;
                 if (entries[i].del == 0) {
-                        pqueue_del(pqueue, &entries[i]);
+                        medusa_pqueue_del(pqueue, &entries[i]);
                         entries[i].del = 1;
                         fprintf(stderr, "  %d @ %d\n", entries[i].pri, entries[i].pos);
                 }
         }
-        if (!pqueue_verify(pqueue)) {
+        if (!medusa_pqueue_verify(pqueue)) {
                 fprintf(stderr, "pqueue is invalid\n");
                 return -1;
         }
 
         fprintf(stderr, "pop\n");
-        for (p = -1; pqueue_count(pqueue) > 0; ) {
-                entry = pqueue_pop(pqueue);
+        for (p = -1; medusa_pqueue_count(pqueue) > 0; ) {
+                entry = medusa_pqueue_pop(pqueue);
                 if (entry == NULL) {
                         return -1;
                 }
@@ -122,12 +122,12 @@ int main (int argc, char *argv[])
                 p = entry->pri;
         }
 
-        entry = pqueue_pop(pqueue);
+        entry = medusa_pqueue_pop(pqueue);
         if (entry != NULL) {
                 return -1;
         }
 
-        pqueue_destroy(pqueue);
+        medusa_pqueue_destroy(pqueue);
         free(entries);
 
         fprintf(stderr, "finish\n");

@@ -26,7 +26,8 @@ enum {
         MEDUSA_DNSREQUEST_EVENT_CANCELED                = (1 << 11),
         MEDUSA_DNSREQUEST_EVENT_ERROR                   = (1 << 12),
         MEDUSA_DNSREQUEST_EVENT_DISCONNECTED            = (1 << 13),
-        MEDUSA_DNSREQUEST_EVENT_DESTROY                 = (1 << 14)
+        MEDUSA_DNSREQUEST_EVENT_STATE_CHANGED           = (1 << 14),
+        MEDUSA_DNSREQUEST_EVENT_DESTROY                 = (1 << 15)
 #define MEDUSA_DNSREQUEST_EVENT_RESOLVING               MEDUSA_DNSREQUEST_EVENT_RESOLVING
 #define MEDUSA_DNSREQUEST_EVENT_RESOLVE_TIMEOUT         MEDUSA_DNSREQUEST_EVENT_RESOLVE_TIMEOUT
 #define MEDUSA_DNSREQUEST_EVENT_RESOLVED                MEDUSA_DNSREQUEST_EVENT_RESOLVED
@@ -41,6 +42,7 @@ enum {
 #define MEDUSA_DNSREQUEST_EVENT_CANCELED                MEDUSA_DNSREQUEST_EVENT_CANCELED
 #define MEDUSA_DNSREQUEST_EVENT_ERROR                   MEDUSA_DNSREQUEST_EVENT_ERROR
 #define MEDUSA_DNSREQUEST_EVENT_DISCONNECTED            MEDUSA_DNSREQUEST_EVENT_DISCONNECTED
+#define MEDUSA_DNSREQUEST_EVENT_STATE_CHANGED           MEDUSA_DNSREQUEST_EVENT_STATE_CHANGED
 #define MEDUSA_DNSREQUEST_EVENT_DESTROY                 MEDUSA_DNSREQUEST_EVENT_DESTROY
 };
 
@@ -54,7 +56,8 @@ enum {
         MEDUSA_DNSREQUEST_STATE_REQUESTING              = 6,
         MEDUSA_DNSREQUEST_STATE_REQUESTED               = 7,
         MEDUSA_DNSREQUEST_STATE_RECEIVING               = 8,
-        MEDUSA_DNSREQUEST_STATE_RECEIVED                = 9
+        MEDUSA_DNSREQUEST_STATE_RECEIVED                = 9,
+        MEDUSA_DNSREQUEST_STATE_ERROR                   = 10
 #define MEDUSA_DNSREQUEST_STATE_UNKNOWN                 MEDUSA_DNSREQUEST_STATE_UNKNOWN
 #define MEDUSA_DNSREQUEST_STATE_DISCONNECTED            MEDUSA_DNSREQUEST_STATE_DISCONNECTED
 #define MEDUSA_DNSREQUEST_STATE_RESOLVING               MEDUSA_DNSREQUEST_STATE_RESOLVING
@@ -65,6 +68,24 @@ enum {
 #define MEDUSA_DNSREQUEST_STATE_REQUESTED               MEDUSA_DNSREQUEST_STATE_REQUESTED
 #define MEDUSA_DNSREQUEST_STATE_RECEIVING               MEDUSA_DNSREQUEST_STATE_RECEIVING
 #define MEDUSA_DNSREQUEST_STATE_RECEIVED                MEDUSA_DNSREQUEST_STATE_RECEIVED
+#define MEDUSA_DNSREQUEST_STATE_ERROR                   MEDUSA_DNSREQUEST_STATE_ERROR
+};
+
+enum {
+        MEDUSA_DNSREQUEST_OPCODE_INVALID                = 0,
+        MEDUSA_DNSREQUEST_OPCODE_QUERY                  = 1,
+        MEDUSA_DNSREQUEST_OPCODE_IQUERY                 = 2,
+        MEDUSA_DNSREQUEST_OPCODE_STATUS                 = 3,
+        MEDUSA_DNSREQUEST_OPCODE_NOTIFY                 = 4,
+        MEDUSA_DNSREQUEST_OPCODE_UPDATE                 = 5,
+        MEDUSA_DNSREQUEST_OPCODE_UNKNOWN                = 6
+#define MEDUSA_DNSREQUEST_OPCODE_INVALID                MEDUSA_DNSREQUEST_OPCODE_INVALID
+#define MEDUSA_DNSREQUEST_OPCODE_QUERY                  MEDUSA_DNSREQUEST_OPCODE_QUERY
+#define MEDUSA_DNSREQUEST_OPCODE_IQUERY                 MEDUSA_DNSREQUEST_OPCODE_IQUERY
+#define MEDUSA_DNSREQUEST_OPCODE_STATUS                 MEDUSA_DNSREQUEST_OPCODE_STATUS
+#define MEDUSA_DNSREQUEST_OPCODE_NOTIFY                 MEDUSA_DNSREQUEST_OPCODE_NOTIFY
+#define MEDUSA_DNSREQUEST_OPCODE_UPDATE                 MEDUSA_DNSREQUEST_OPCODE_UPDATE
+#define MEDUSA_DNSREQUEST_OPCODE_UNKNOWN                MEDUSA_DNSREQUEST_OPCODE_UNKNOWN
 };
 
 enum {
@@ -78,6 +99,7 @@ enum {
         MEDUSA_DNSREQUEST_RECORD_TYPE_AAAA              = 28,
         MEDUSA_DNSREQUEST_RECORD_TYPE_SRV               = 33,
         MEDUSA_DNSREQUEST_RECORD_TYPE_NAPTR             = 35,
+        MEDUSA_DNSREQUEST_RECORD_TYPE_HTTPS             = 65,
         MEDUSA_DNSREQUEST_RECORD_TYPE_ANY               = 255,
         MEDUSA_DNSREQUEST_RECORD_TYPE_UNKNOWN           = 65280
 #define MEDUSA_DNSREQUEST_RECORD_TYPE_INVALID           MEDUSA_DNSREQUEST_RECORD_TYPE_INVALID
@@ -90,6 +112,7 @@ enum {
 #define MEDUSA_DNSREQUEST_RECORD_TYPE_AAAA              MEDUSA_DNSREQUEST_RECORD_TYPE_AAAA
 #define MEDUSA_DNSREQUEST_RECORD_TYPE_SRV               MEDUSA_DNSREQUEST_RECORD_TYPE_SRV
 #define MEDUSA_DNSREQUEST_RECORD_TYPE_NAPTR             MEDUSA_DNSREQUEST_RECORD_TYPE_NAPTR
+#define MEDUSA_DNSREQUEST_RECORD_TYPE_HTTPS             MEDUSA_DNSREQUEST_RECORD_TYPE_HTTPS
 #define MEDUSA_DNSREQUEST_RECORD_TYPE_ANY               MEDUSA_DNSREQUEST_RECORD_TYPE_ANY
 #define MEDUSA_DNSREQUEST_RECORD_TYPE_UNKNOWN           MEDUSA_DNSREQUEST_RECORD_TYPE_UNKNOWN
 };
@@ -99,8 +122,26 @@ struct medusa_dnsrequest_init_options {
         int (*onevent) (struct medusa_dnsrequest *dnsrequest, unsigned int events, void *context, void *param);
         void *context;
         const char *nameserver;
+        int port;
+        unsigned int code;
         unsigned int type;
         const char *name;
+        int id;
+        double resolve_timeout;
+        double connect_timeout;
+        double receive_timeout;
+        int enabled;
+};
+
+struct medusa_dnsrequest_event_error {
+        unsigned int state;
+        unsigned int error;
+};
+
+struct medusa_dnsrequest_event_state_changed {
+        unsigned int pstate;
+        unsigned int state;
+        unsigned int error;
 };
 
 #ifdef __cplusplus
@@ -116,7 +157,10 @@ struct medusa_dnsrequest * medusa_dnsrequest_create (struct medusa_monitor *moni
 struct medusa_dnsrequest * medusa_dnsrequest_create_with_options (const struct medusa_dnsrequest_init_options *options);
 void medusa_dnsrequest_destroy (struct medusa_dnsrequest *dnsrequest);
 
-unsigned int medusa_dnsrequest_get_state (const struct medusa_dnsrequest *dnsrequest);
+int medusa_dnsrequest_get_state (const struct medusa_dnsrequest *dnsrequest);
+
+int medusa_dnsrequest_set_resolve_timeout (struct medusa_dnsrequest *dnsrequest, double timeout);
+double medusa_dnsrequest_get_resolve_timeout (const struct medusa_dnsrequest *dnsrequest);
 
 int medusa_dnsrequest_set_connect_timeout (struct medusa_dnsrequest *dnsrequest, double timeout);
 double medusa_dnsrequest_get_connect_timeout (const struct medusa_dnsrequest *dnsrequest);
@@ -127,11 +171,20 @@ double medusa_dnsrequest_get_receive_timeout (const struct medusa_dnsrequest *dn
 int medusa_dnsrequest_set_nameserver (struct medusa_dnsrequest *dnsrequest, const char *nameserver);
 const char * medusa_dnsrequest_get_nameserver (struct medusa_dnsrequest *dnsrequest);
 
+int medusa_dnsrequest_set_port (struct medusa_dnsrequest *dnsrequest, unsigned int port);
+int medusa_dnsrequest_get_port (struct medusa_dnsrequest *dnsrequest);
+
+int medusa_dnsrequest_set_code (struct medusa_dnsrequest *dnsrequest, unsigned int code);
+int medusa_dnsrequest_get_code (struct medusa_dnsrequest *dnsrequest);
+
 int medusa_dnsrequest_set_type (struct medusa_dnsrequest *dnsrequest, unsigned int type);
 int medusa_dnsrequest_get_type (struct medusa_dnsrequest *dnsrequest);
 
 int medusa_dnsrequest_set_name (struct medusa_dnsrequest *dnsrequest, const char *name);
 const char * medusa_dnsrequest_get_name (struct medusa_dnsrequest *dnsrequest);
+
+int medusa_dnsrequest_set_id (struct medusa_dnsrequest *dnsrequest, int id);
+int medusa_dnsrequest_get_id (struct medusa_dnsrequest *dnsrequest);
 
 void * medusa_dnsrequest_get_context (struct medusa_dnsrequest *dnsrequest);
 int medusa_dnsrequest_set_context (struct medusa_dnsrequest *dnsrequest, void *context);
@@ -202,8 +255,14 @@ const struct medusa_dnsrequest_reply_header * medusa_dnsrequest_reply_get_header
 const struct medusa_dnsrequest_reply_questions * medusa_dnsrequest_reply_get_questions (const struct medusa_dnsrequest_reply *reply);
 const struct medusa_dnsrequest_reply_answers * medusa_dnsrequest_reply_get_answers (const struct medusa_dnsrequest_reply *reply);
 
+struct medusa_dnsrequest_reply_answers * medusa_dnsrequest_reply_answers_copy (const struct medusa_dnsrequest_reply_answers *ansrers);
+void medusa_dnsrequest_reply_answers_destroy (struct medusa_dnsrequest_reply_answers *answers);
+
 int medusa_dnsrequest_onevent (struct medusa_dnsrequest *dnsrequest, unsigned int events, void *param);
 struct medusa_monitor * medusa_dnsrequest_get_monitor (struct medusa_dnsrequest *dnsrequest);
+
+unsigned int medusa_dnsrequest_opcode_value (const char *type);
+const char * medusa_dnsrequest_opcode_string (unsigned int type);
 
 unsigned int medusa_dnsrequest_record_type_value (const char *type);
 const char * medusa_dnsrequest_record_type_string (unsigned int type);

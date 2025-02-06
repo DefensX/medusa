@@ -2,7 +2,7 @@
 #if !defined(MEDUSA_QUEUE_H)
 #define MEDUSA_QUEUE_H
 
-#include <sys/queue.h>
+#include "queue_sys.h"
 
 /*
  * Singly-linked List missing functions.

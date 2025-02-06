@@ -8,13 +8,17 @@ struct medusa_httprequest {
         int (*onevent) (struct medusa_httprequest *httprequest, unsigned int events, void *context, void *param);
         void *context;
         char *method;
+        char *url;
         struct medusa_buffer *headers;
         struct medusa_tcpsocket *tcpsocket;
+        struct medusa_dnsresolver *dnsresolver;
+        double resolve_timeout;
         double connect_timeout;
         double read_timeout;
         http_parser http_parser;
         http_parser_settings http_parser_settings;
         struct medusa_httprequest_reply *reply;
+        void *userdata;
 };
 
 int medusa_httprequest_init (struct medusa_httprequest *httprequest, struct medusa_monitor *monitor, int (*onevent) (struct medusa_httprequest *httprequest, unsigned int events, void *context, void *param), void *context);

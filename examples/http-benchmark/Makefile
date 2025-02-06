@@ -24,6 +24,11 @@ medusa-http-benchmark_ldflags-${MEDUSA_TCPSOCKET_OPENSSL_ENABLE} += \
 	-lssl \
 	-lcrypto
 
+medusa-http-benchmark_ldflags-${__WINDOWS__} += \
+	-lws2_32 \
+	-lcrypt32 \
+	-static
+
 medusa-http-benchmark_ldflags-$(__LINUX__) += \
 	-lrt
 
@@ -35,4 +40,4 @@ dist.dir = ../../dist
 dist.bin-y = \
 	medusa-http-benchmark
 
-include ../../Makefile.lib
+include ../../3rdparty/libmakefile/Makefile.lib

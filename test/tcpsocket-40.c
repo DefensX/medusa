@@ -127,13 +127,13 @@ static int tcpsocket_listener_onevent (struct medusa_tcpsocket *tcpsocket, unsig
                         return -1;
                 }
 #if defined(MEDUSA_TEST_TCPSOCKET_SSL) && (MEDUSA_TEST_TCPSOCKET_SSL == 1)
-                rc = medusa_tcpsocket_set_ssl_certificate(accepted, "tcpsocket-ssl.crt");
+                rc = medusa_tcpsocket_set_ssl_certificate_file(accepted, "tcpsocket-ssl.crt");
                 if (rc < 0) {
                         fprintf(stderr, "medusa_tcpsocket_set_ssl_certificate failed\n");
                         medusa_tcpsocket_destroy(accepted);
                         return -1;
                 }
-                rc = medusa_tcpsocket_set_ssl_privatekey(accepted, "tcpsocket-ssl.key");
+                rc = medusa_tcpsocket_set_ssl_privatekey_file(accepted, "tcpsocket-ssl.key");
                 if (rc < 0) {
                         fprintf(stderr, "medusa_tcpsocket_set_ssl_privatekey failed\n");
                         medusa_tcpsocket_destroy(accepted);

@@ -21,6 +21,11 @@ medusa-echo-client_ldflags-${MEDUSA_TCPSOCKET_OPENSSL_ENABLE} += \
 	-lssl \
 	-lcrypto
 
+medusa-echo-client_ldflags-${__WINDOWS__} += \
+	-lws2_32 \
+	-lcrypt32 \
+	-static
+
 medusa-echo-client_ldflags-$(__LINUX__) += \
 	-lrt
 
@@ -32,4 +37,4 @@ dist.dir = ../../dist
 dist.bin-y = \
 	medusa-echo-client
 
-include ../../Makefile.lib
+include ../../3rdparty/libmakefile/Makefile.lib

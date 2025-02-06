@@ -22,29 +22,30 @@ enum {
 };
 
 enum {
-        MEDUSA_TCPSOCKET_EVENT_BINDING                  = (1 <<  0), /* 0x00000001 */
-        MEDUSA_TCPSOCKET_EVENT_BOUND                    = (1 <<  1), /* 0x00000002 */
-        MEDUSA_TCPSOCKET_EVENT_LISTENING                = (1 <<  2), /* 0x00000004 */
-        MEDUSA_TCPSOCKET_EVENT_CONNECTION               = (1 <<  3), /* 0x00000008 */
-        MEDUSA_TCPSOCKET_EVENT_RESOLVING                = (1 <<  4), /* 0x00000010 */
-        MEDUSA_TCPSOCKET_EVENT_RESOLVE_TIMEOUT          = (1 <<  5), /* 0x00000020 */
-        MEDUSA_TCPSOCKET_EVENT_RESOLVED                 = (1 <<  6), /* 0x00000040 */
-        MEDUSA_TCPSOCKET_EVENT_CONNECTING               = (1 <<  7), /* 0x00000080 */
-        MEDUSA_TCPSOCKET_EVENT_CONNECT_TIMEOUT          = (1 <<  8), /* 0x00000100 */
-        MEDUSA_TCPSOCKET_EVENT_CONNECTED                = (1 <<  9), /* 0x00000200 */
-        MEDUSA_TCPSOCKET_EVENT_CONNECTED_SSL            = (1 << 10), /* 0x00000400 */
-        MEDUSA_TCPSOCKET_EVENT_IN                       = (1 << 11), /* 0x00000800 */
-        MEDUSA_TCPSOCKET_EVENT_IN_TIMEOUT               = (1 << 12), /* 0x00001000 */
-        MEDUSA_TCPSOCKET_EVENT_OUT                      = (1 << 13), /* 0x00002000 */
-        MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ            = (1 << 14), /* 0x00004000 */
-        MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ_TIMEOUT    = (1 << 15), /* 0x00008000 */
-        MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE           = (1 << 16), /* 0x00010000 */
-        MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE_TIMEOUT   = (1 << 17), /* 0x00020000 */
-        MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE_FINISHED  = (1 << 18), /* 0x00040000 */
-        MEDUSA_TCPSOCKET_EVENT_DISCONNECTED             = (1 << 19), /* 0x00080000 */
-        MEDUSA_TCPSOCKET_EVENT_ERROR                    = (1 << 20), /* 0x00100000 */
-        MEDUSA_TCPSOCKET_EVENT_STATE_CHANGED            = (1 << 21), /* 0x00200000 */
-        MEDUSA_TCPSOCKET_EVENT_DESTROY                  = (1 << 22)  /* 0x00400000 */
+        MEDUSA_TCPSOCKET_EVENT_BINDING                  = (1 <<  0),
+        MEDUSA_TCPSOCKET_EVENT_BOUND                    = (1 <<  1),
+        MEDUSA_TCPSOCKET_EVENT_LISTENING                = (1 <<  2),
+        MEDUSA_TCPSOCKET_EVENT_CONNECTION               = (1 <<  3),
+        MEDUSA_TCPSOCKET_EVENT_RESOLVING                = (1 <<  4),
+        MEDUSA_TCPSOCKET_EVENT_RESOLVE_TIMEOUT          = (1 <<  5),
+        MEDUSA_TCPSOCKET_EVENT_RESOLVED                 = (1 <<  6),
+        MEDUSA_TCPSOCKET_EVENT_CONNECTING               = (1 <<  7),
+        MEDUSA_TCPSOCKET_EVENT_CONNECT_TIMEOUT          = (1 <<  8),
+        MEDUSA_TCPSOCKET_EVENT_CONNECTED                = (1 <<  9),
+        MEDUSA_TCPSOCKET_EVENT_CONNECTED_SSL            = (1 << 10),
+        MEDUSA_TCPSOCKET_EVENT_IN                       = (1 << 11),
+        MEDUSA_TCPSOCKET_EVENT_IN_TIMEOUT               = (1 << 12),
+        MEDUSA_TCPSOCKET_EVENT_OUT                      = (1 << 13),
+        MEDUSA_TCPSOCKET_EVENT_OUT_TIMEOUT              = (1 << 14),
+        MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ            = (1 << 15),
+        MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ_TIMEOUT    = (1 << 16),
+        MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE           = (1 << 17),
+        MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE_TIMEOUT   = (1 << 18),
+        MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE_FINISHED  = (1 << 19),
+        MEDUSA_TCPSOCKET_EVENT_DISCONNECTED             = (1 << 20),
+        MEDUSA_TCPSOCKET_EVENT_ERROR                    = (1 << 21),
+        MEDUSA_TCPSOCKET_EVENT_STATE_CHANGED            = (1 << 22),
+        MEDUSA_TCPSOCKET_EVENT_DESTROY                  = (1 << 23)
 #define MEDUSA_TCPSOCKET_EVENT_BINDING                  MEDUSA_TCPSOCKET_EVENT_BINDING
 #define MEDUSA_TCPSOCKET_EVENT_BOUND                    MEDUSA_TCPSOCKET_EVENT_BOUND
 #define MEDUSA_TCPSOCKET_EVENT_LISTENING                MEDUSA_TCPSOCKET_EVENT_LISTENING
@@ -59,6 +60,7 @@ enum {
 #define MEDUSA_TCPSOCKET_EVENT_IN                       MEDUSA_TCPSOCKET_EVENT_IN
 #define MEDUSA_TCPSOCKET_EVENT_IN_TIMEOUT               MEDUSA_TCPSOCKET_EVENT_IN_TIMEOUT
 #define MEDUSA_TCPSOCKET_EVENT_OUT                      MEDUSA_TCPSOCKET_EVENT_OUT
+#define MEDUSA_TCPSOCKET_EVENT_OUT_TIMEOUT              MEDUSA_TCPSOCKET_EVENT_OUT_TIMEOUT
 #define MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ            MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ
 #define MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ_TIMEOUT    MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ_TIMEOUT
 #define MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE           MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE
@@ -104,10 +106,16 @@ struct medusa_tcpsocket_bind_options {
         int clodestroy;
         int reuseaddr;
         int reuseport;
+        int freebind;
         int nonblocking;
         int nodelay;
         int backlog;
         int buffered;
+        int ssl;
+        const char *ssl_certificate;
+        const char *ssl_privatekey;
+        const char *ssl_ca_certificate;
+        int ssl_verify;
         int enabled;
 };
 
@@ -124,6 +132,7 @@ struct medusa_tcpsocket_accept_options {
 
 struct medusa_tcpsocket_connect_options {
         struct medusa_monitor *monitor;
+        struct medusa_dnsresolver *dnsresolver;
         int (*onevent) (struct medusa_tcpsocket *tcpsocket, unsigned int events, void *context, void *param);
         void *context;
         unsigned int protocol;
@@ -132,7 +141,9 @@ struct medusa_tcpsocket_connect_options {
         unsigned int sprotocol;
         const char *saddress;
         unsigned short sport;
-        double timeout;
+        double resolve_timeout;
+        double connect_timeout;
+        double read_timeout;
         int fd;
         int clodestroy;
         int reuseaddr;
@@ -140,6 +151,11 @@ struct medusa_tcpsocket_connect_options {
         int nonblocking;
         int nodelay;
         int buffered;
+        int ssl;
+        const char *ssl_certificate;
+        const char *ssl_privatekey;
+        const char *ssl_ca_certificate;
+        int ssl_verify;
         int enabled;
 };
 
@@ -164,12 +180,14 @@ struct medusa_tcpsocket_event_buffered_write {
 struct medusa_tcpsocket_event_error {
         unsigned int state;
         unsigned int error;
+        unsigned int line;
 };
 
 struct medusa_tcpsocket_event_state_changed {
         unsigned int pstate;
         unsigned int state;
         unsigned int error;
+        unsigned int line;
 };
 
 #ifdef __cplusplus
@@ -222,8 +240,14 @@ int medusa_tcpsocket_get_reuseaddr (const struct medusa_tcpsocket *tcpsocket);
 int medusa_tcpsocket_set_reuseport (struct medusa_tcpsocket *tcpsocket, int enabled);
 int medusa_tcpsocket_get_reuseport (const struct medusa_tcpsocket *tcpsocket);
 
+int medusa_tcpsocket_set_freebind (struct medusa_tcpsocket *tcpsocket, int enabled);
+int medusa_tcpsocket_get_freebind (const struct medusa_tcpsocket *tcpsocket);
+
 int medusa_tcpsocket_set_backlog (struct medusa_tcpsocket *tcpsocket, int backlog);
 int medusa_tcpsocket_get_backlog (const struct medusa_tcpsocket *tcpsocket);
+
+int medusa_tcpsocket_set_resolve_timeout (struct medusa_tcpsocket *tcpsocket, double timeout);
+double medusa_tcpsocket_get_resolve_timeout (const struct medusa_tcpsocket *tcpsocket);
 
 int medusa_tcpsocket_set_connect_timeout (struct medusa_tcpsocket *tcpsocket, double timeout);
 double medusa_tcpsocket_get_connect_timeout (const struct medusa_tcpsocket *tcpsocket);
@@ -231,14 +255,26 @@ double medusa_tcpsocket_get_connect_timeout (const struct medusa_tcpsocket *tcps
 int medusa_tcpsocket_set_read_timeout (struct medusa_tcpsocket *tcpsocket, double timeout);
 double medusa_tcpsocket_get_read_timeout (const struct medusa_tcpsocket *tcpsocket);
 
+int medusa_tcpsocket_set_write_timeout (struct medusa_tcpsocket *tcpsocket, double timeout);
+double medusa_tcpsocket_get_write_timeout (const struct medusa_tcpsocket *tcpsocket);
+
 int medusa_tcpsocket_set_ssl (struct medusa_tcpsocket *tcpsocket, int enable);
 int medusa_tcpsocket_get_ssl (const struct medusa_tcpsocket *tcpsocket);
 
-int medusa_tcpsocket_set_ssl_certificate (struct medusa_tcpsocket *tcpsocket, const char *certificate);
+int medusa_tcpsocket_set_ssl_verify (struct medusa_tcpsocket *tcpsocket, int enable);
+int medusa_tcpsocket_get_ssl_verify (const struct medusa_tcpsocket *tcpsocket);
+
+int medusa_tcpsocket_set_ssl_certificate (struct medusa_tcpsocket *tcpsocket, const char *certificate, int length);
+int medusa_tcpsocket_set_ssl_certificate_file (struct medusa_tcpsocket *tcpsocket, const char *certificate);
 const char * medusa_tcpsocket_get_ssl_certificate (const struct medusa_tcpsocket *tcpsocket);
 
-int medusa_tcpsocket_set_ssl_privatekey (struct medusa_tcpsocket *tcpsocket, const char *privatekey);
+int medusa_tcpsocket_set_ssl_privatekey (struct medusa_tcpsocket *tcpsocket, const char *privatekey, int length);
+int medusa_tcpsocket_set_ssl_privatekey_file (struct medusa_tcpsocket *tcpsocket, const char *privatekey);
 const char * medusa_tcpsocket_get_ssl_privatekey (const struct medusa_tcpsocket *tcpsocket);
+
+int medusa_tcpsocket_set_ssl_ca_certificate (struct medusa_tcpsocket *tcpsocket, const char *ca_certificate, int length);
+int medusa_tcpsocket_set_ssl_ca_certificate_file (struct medusa_tcpsocket *tcpsocket, const char *ca_certificate);
+const char * medusa_tcpsocket_get_ssl_ca_certificate (const struct medusa_tcpsocket *tcpsocket);
 
 int medusa_tcpsocket_ssl_set_SSL (struct medusa_tcpsocket *tcpsocket, struct ssl_st *ssl);
 struct ssl_st * medusa_tcpsocket_ssl_get_SSL (const struct medusa_tcpsocket *tcpsocket);
@@ -255,6 +291,8 @@ int medusa_tcpsocket_add_events (struct medusa_tcpsocket *tcpsocket, unsigned in
 int medusa_tcpsocket_del_events (struct medusa_tcpsocket *tcpsocket, unsigned int events);
 unsigned int medusa_tcpsocket_get_events (const struct medusa_tcpsocket *io);
 
+int medusa_tcpsocket_get_protocol (struct medusa_tcpsocket *tcpsocket);
+int medusa_tcpsocket_get_sockport (struct medusa_tcpsocket *tcpsocket);
 int medusa_tcpsocket_get_sockname (struct medusa_tcpsocket *tcpsocket, struct sockaddr_storage *sockaddr);
 int medusa_tcpsocket_get_peername (struct medusa_tcpsocket *tcpsocket, struct sockaddr_storage *sockaddr);
 
