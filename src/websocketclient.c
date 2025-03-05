@@ -100,6 +100,9 @@ static inline int websocketclient_has_flag (const struct medusa_websocketclient 
 
 static inline int websocketclient_set_state (struct medusa_websocketclient *websocketclient, unsigned int state)
 {
+        int rc;
+        unsigned int pstate;
+        struct medusa_websocketclient_event_state_changed medusa_websocketclient_event_state_changed;
         websocketclient->error = 0;
         if (state == MEDUSA_WEBSOCKETCLIENT_STATE_ERROR) {
                 if (!MEDUSA_IS_ERR_OR_NULL(websocketclient->tcpsocket)) {
@@ -113,7 +116,14 @@ static inline int websocketclient_set_state (struct medusa_websocketclient *webs
                         websocketclient->tcpsocket = NULL;
                 }
         }
+        pstate = websocketclient->state;
         websocketclient->state = state;
+        medusa_websocketclient_event_state_changed.pstate = pstate;
+        medusa_websocketclient_event_state_changed.state  = websocketclient->state;
+        rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_STATE_CHANGED, &medusa_websocketclient_event_state_changed);
+        if (rc < 0) {
+                return rc;
+        }
         return 0;
 }
 
@@ -1424,6 +1434,7 @@ __attribute__ ((visibility ("default"))) const char * medusa_websocketclient_eve
         if (events == MEDUSA_WEBSOCKETCLIENT_EVENT_BUFFERED_WRITE)              return "MEDUSA_WEBSOCKETCLIENT_EVENT_BUFFERED_WRITE";
         if (events == MEDUSA_WEBSOCKETCLIENT_EVENT_BUFFERED_WRITE_FINISHED)     return "MEDUSA_WEBSOCKETCLIENT_EVENT_BUFFERED_WRITE_FINISHED";
         if (events == MEDUSA_WEBSOCKETCLIENT_EVENT_DISCONNECTED)                return "MEDUSA_WEBSOCKETCLIENT_EVENT_DISCONNECTED";
+        if (events == MEDUSA_WEBSOCKETCLIENT_EVENT_STATE_CHANGED)               return "MEDUSA_WEBSOCKETCLIENT_EVENT_STATE_CHANGED";
         if (events == MEDUSA_WEBSOCKETCLIENT_EVENT_DESTROY)                     return "MEDUSA_WEBSOCKETCLIENT_EVENT_DESTROY";
         return "MEDUSA_WEBSOCKETCLIENT_EVENT_UNKNOWN";
 }
