@@ -960,6 +960,9 @@ static inline int websocketserver_client_has_flag (const struct medusa_websocket
 
 static inline int websocketserver_client_set_state (struct medusa_websocketserver_client *websocketserver_client, unsigned int state)
 {
+        int rc;
+        unsigned int pstate;
+        struct medusa_websocketserver_client_event_state_changed medusa_websocketserver_client_event_state_changed;
         websocketserver_client->error = 0;
         if (state == MEDUSA_WEBSOCKETSERVER_CLIENT_STATE_ERROR) {
                 if (!MEDUSA_IS_ERR_OR_NULL(websocketserver_client->tcpsocket)) {
@@ -973,7 +976,14 @@ static inline int websocketserver_client_set_state (struct medusa_websocketserve
                         websocketserver_client->tcpsocket = NULL;
                 }
         }
+        pstate = websocketserver_client->state;
         websocketserver_client->state = state;
+        medusa_websocketserver_client_event_state_changed.pstate = pstate;
+        medusa_websocketserver_client_event_state_changed.state  = websocketserver_client->state;
+        rc = medusa_websocketserver_client_onevent_unlocked(websocketserver_client, MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_STATE_CHANGED, &medusa_websocketserver_client_event_state_changed);
+        if (rc < 0) {
+                return rc;
+        }
         return 0;
 }
 
@@ -2233,6 +2243,7 @@ __attribute__ ((visibility ("default"))) const char * medusa_websocketserver_cli
         if (events == MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_BUFFERED_WRITE)               return "MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_BUFFERED_WRITE";
         if (events == MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_BUFFERED_WRITE_FINISHED)      return "MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_BUFFERED_WRITE_FINISHED";
         if (events == MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_DISCONNECTED)                 return "MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_DISCONNECTED";
+        if (events == MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_STATE_CHANGED)                return "MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_STATE_CHANGED";
         if (events == MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_DESTROY)                      return "MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_DESTROY";
         return "MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_UNKNOWN";
 }

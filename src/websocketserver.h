@@ -64,7 +64,8 @@ enum {
         MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_BUFFERED_WRITE              = (1 <<  7),
         MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_BUFFERED_WRITE_FINISHED     = (1 <<  8),
         MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_DISCONNECTED                = (1 <<  9),
-        MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_DESTROY                     = (1 << 10)
+        MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_STATE_CHANGED               = (1 << 10),
+        MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_DESTROY                     = (1 << 11)
 #define MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_ERROR                       MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_ERROR
 #define MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_ACCEPTED                    MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_ACCEPTED
 #define MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_REQUEST_RECEIVING           MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_REQUEST_RECEIVING
@@ -75,6 +76,7 @@ enum {
 #define MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_BUFFERED_WRITE              MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_BUFFERED_WRITE
 #define MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_BUFFERED_WRITE_FINISHED     MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_BUFFERED_WRITE_FINISHED
 #define MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_DISCONNECTED                MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_DISCONNECTED
+#define MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_STATE_CHANGED               MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_STATE_CHANGED
 #define MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_DESTROY                     MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_DESTROY
 };
 
@@ -130,6 +132,11 @@ struct medusa_websocketserver_accept_options {
         double write_timeout;
         int (*onevent) (struct medusa_websocketserver_client *websocketserver_client, unsigned int events, void *context, void *param);
         void *context;
+};
+
+struct medusa_websocketserver_client_event_state_changed {
+        unsigned int pstate;
+        unsigned int state;
 };
 
 struct medusa_websocketserver_client_event_request_header {
