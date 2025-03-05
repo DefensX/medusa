@@ -356,6 +356,7 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
 
                 rc = medusa_tcpsocket_printf_unlocked(websocketclient->tcpsocket,
                         "GET %s HTTP/1.1\r\n"
+                        "Host: %s\r\n"
 			"Upgrade: websocket\r\n"
                         "Sec-WebSocket-Version: 13\r\n"
                         "Sec-WebSocket-Protocol: %s\r\n"
@@ -366,6 +367,7 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
                         "Upgrade: websocket\r\n"
                         "\r\n",
                         (websocketclient->sec_websocket_path) ? websocketclient->sec_websocket_path : "/",
+                        websocketclient->host,
                         (websocketclient->sec_websocket_protocol) ? websocketclient->sec_websocket_protocol : "generic",
 			websocketclient->sec_websocket_key);
                 if (rc < 0) {
@@ -819,6 +821,9 @@ __attribute__ ((visibility ("default"))) struct medusa_websocketclient * medusa_
         if (MEDUSA_IS_ERR_OR_NULL(options->onevent)) {
                 return MEDUSA_ERR_PTR(-EINVAL);
         }
+        if (MEDUSA_IS_ERR_OR_NULL(options->address)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
 
 #if defined(MEDUSA_WEBSOCKETCLIENT_USE_POOL) && (MEDUSA_WEBSOCKETCLIENT_USE_POOL == 1)
         websocketclient = medusa_pool_malloc(g_pool_websocketclient);
@@ -843,6 +848,13 @@ __attribute__ ((visibility ("default"))) struct medusa_websocketclient * medusa_
         if (options->server_protocol != NULL) {
                 websocketclient->sec_websocket_protocol = strdup(options->server_protocol);
                 if (websocketclient->sec_websocket_protocol == NULL) {
+                        error = -ENOMEM;
+                        goto bail;
+                }
+        }
+        if (options->address != NULL) {
+                websocketclient->host = strdup(options->address);
+                if (websocketclient->host == NULL) {
                         error = -ENOMEM;
                         goto bail;
                 }
@@ -1384,6 +1396,10 @@ __attribute__ ((visibility ("default"))) int medusa_websocketclient_onevent_unlo
                 if (!MEDUSA_IS_ERR_OR_NULL(websocketclient->tcpsocket)) {
                         medusa_tcpsocket_destroy_unlocked(websocketclient->tcpsocket);
                         websocketclient->tcpsocket = NULL;
+                }
+                if (websocketclient->host != NULL) {
+                        free(websocketclient->host);
+                        websocketclient->host = NULL;
                 }
 #if defined(MEDUSA_WEBSOCKETCLIENT_USE_POOL) && (MEDUSA_WEBSOCKETCLIENT_USE_POOL == 1)
                 medusa_pool_free(websocketclient);
