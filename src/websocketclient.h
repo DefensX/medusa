@@ -86,6 +86,11 @@ struct medusa_websocketclient_connect_options {
         unsigned short port;
         const char *server_path;
         const char *server_protocol;
+        int ssl;
+        const char *ssl_certificate;
+        const char *ssl_privatekey;
+        const char *ssl_ca_certificate;
+        int ssl_verify;
         int enabled;
         int (*onevent) (struct medusa_websocketclient *websocketclient, unsigned int events, void *context, void *param);
         void *context;

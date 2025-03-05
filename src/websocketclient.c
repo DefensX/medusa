@@ -867,18 +867,23 @@ __attribute__ ((visibility ("default"))) struct medusa_websocketclient * medusa_
                 error = rc;
                 goto bail;
         }
-        medusa_tcpsocket_connect_options.monitor     = options->monitor;
-        medusa_tcpsocket_connect_options.port        = options->port;
-        medusa_tcpsocket_connect_options.protocol    = (options->protocol == MEDUSA_WEBSOCKETCLIENT_PROTOCOL_IPV4) ? MEDUSA_TCPSOCKET_PROTOCOL_IPV4 :
-                                                       (options->protocol == MEDUSA_WEBSOCKETCLIENT_PROTOCOL_IPV6) ? MEDUSA_TCPSOCKET_PROTOCOL_IPV6 :
-                                                       MEDUSA_TCPSOCKET_PROTOCOL_ANY;
-        medusa_tcpsocket_connect_options.address     = options->address;
-        medusa_tcpsocket_connect_options.buffered    = 1;
-        medusa_tcpsocket_connect_options.nodelay     = 1;
-        medusa_tcpsocket_connect_options.nonblocking = 1;
-        medusa_tcpsocket_connect_options.enabled     = options->enabled;
-        medusa_tcpsocket_connect_options.onevent     = websocketclient_tcpsocket_onevent;
-        medusa_tcpsocket_connect_options.context     = websocketclient;
+        medusa_tcpsocket_connect_options.monitor                = options->monitor;
+        medusa_tcpsocket_connect_options.port                   = options->port;
+        medusa_tcpsocket_connect_options.protocol               = (options->protocol == MEDUSA_WEBSOCKETCLIENT_PROTOCOL_IPV4) ? MEDUSA_TCPSOCKET_PROTOCOL_IPV4 :
+                                                                  (options->protocol == MEDUSA_WEBSOCKETCLIENT_PROTOCOL_IPV6) ? MEDUSA_TCPSOCKET_PROTOCOL_IPV6 :
+                                                                  MEDUSA_TCPSOCKET_PROTOCOL_ANY;
+        medusa_tcpsocket_connect_options.address                = options->address;
+        medusa_tcpsocket_connect_options.buffered               = 1;
+        medusa_tcpsocket_connect_options.nodelay                = 1;
+        medusa_tcpsocket_connect_options.nonblocking            = 1;
+        medusa_tcpsocket_connect_options.ssl                    = options->ssl;
+        medusa_tcpsocket_connect_options.ssl_ca_certificate     = options->ssl_ca_certificate;
+        medusa_tcpsocket_connect_options.ssl_certificate        = options->ssl_certificate;
+        medusa_tcpsocket_connect_options.ssl_privatekey         = options->ssl_privatekey;
+        medusa_tcpsocket_connect_options.ssl_verify             = options->ssl_verify;
+        medusa_tcpsocket_connect_options.enabled                = options->enabled;
+        medusa_tcpsocket_connect_options.onevent                = websocketclient_tcpsocket_onevent;
+        medusa_tcpsocket_connect_options.context                = websocketclient;
         connected = medusa_tcpsocket_connect_with_options_unlocked(&medusa_tcpsocket_connect_options);
         if (MEDUSA_IS_ERR_OR_NULL(connected)) {
                 error = MEDUSA_PTR_ERR(connected);
