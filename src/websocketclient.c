@@ -888,11 +888,6 @@ __attribute__ ((visibility ("default"))) struct medusa_websocketclient * medusa_
         medusa_tcpsocket_connect_options.buffered               = 1;
         medusa_tcpsocket_connect_options.nodelay                = 1;
         medusa_tcpsocket_connect_options.nonblocking            = 1;
-        medusa_tcpsocket_connect_options.ssl                    = options->ssl;
-        medusa_tcpsocket_connect_options.ssl_ca_certificate     = options->ssl_ca_certificate;
-        medusa_tcpsocket_connect_options.ssl_certificate        = options->ssl_certificate;
-        medusa_tcpsocket_connect_options.ssl_privatekey         = options->ssl_privatekey;
-        medusa_tcpsocket_connect_options.ssl_verify             = options->ssl_verify;
         medusa_tcpsocket_connect_options.enabled                = options->enabled;
         medusa_tcpsocket_connect_options.onevent                = websocketclient_tcpsocket_onevent;
         medusa_tcpsocket_connect_options.context                = websocketclient;
@@ -902,6 +897,11 @@ __attribute__ ((visibility ("default"))) struct medusa_websocketclient * medusa_
                 goto bail;
         }
         websocketclient->tcpsocket = connected;
+        rc = medusa_tcpsocket_set_ssl_unlocked(websocketclient->tcpsocket, options->ssl);
+        if (rc < 0) {
+                error = - rc;
+                goto bail;
+        }
 
         return websocketclient;
 bail:   if (MEDUSA_IS_ERR_OR_NULL(websocketclient)) {
