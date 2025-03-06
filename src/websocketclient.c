@@ -323,8 +323,6 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
         struct medusa_monitor *monitor;
         struct medusa_websocketclient *websocketclient = (struct medusa_websocketclient *) context;
 
-        fprintf(stderr, "%s\n", medusa_tcpsocket_event_string(events));
-
         if (events & MEDUSA_TCPSOCKET_EVENT_DESTROY) {
                 return 0;
         }
