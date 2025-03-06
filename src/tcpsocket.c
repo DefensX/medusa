@@ -2535,6 +2535,15 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 goto bail;
         }
 
+#if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
+        tcpsocket->ssl_hostname = strdup(address);
+        if (tcpsocket->ssl_hostname == NULL) {
+                ret = -ENOMEM;
+                line = __LINE__;
+                goto bail;
+        }
+#endif
+
         tcpsocket = tcpsocket_create_unlocked(options->monitor, options->onevent, options->context);
         if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
                 ret = MEDUSA_PTR_ERR(tcpsocket);
@@ -2644,15 +2653,6 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 line = __LINE__;
                 goto bail;
         }
-
-#if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
-        tcpsocket->ssl_hostname = strdup(address);
-        if (tcpsocket->ssl_hostname == NULL) {
-                ret = -ENOMEM;
-                line = __LINE__;
-                goto bail;
-        }
-#endif
 
         resolve = 1;
         if (protocol == MEDUSA_TCPSOCKET_PROTOCOL_IPV4) {
