@@ -323,6 +323,8 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
         struct medusa_monitor *monitor;
         struct medusa_websocketclient *websocketclient = (struct medusa_websocketclient *) context;
 
+        fprintf(stderr, "%s\n", medusa_tcpsocket_event_string(events));
+
         if (events & MEDUSA_TCPSOCKET_EVENT_DESTROY) {
                 return 0;
         }
@@ -745,9 +747,6 @@ short_buffer:
                 }
                 medusa_websocketclient_destroy_unlocked(websocketclient);
         } else if (events & MEDUSA_TCPSOCKET_EVENT_STATE_CHANGED) {
-        } else {
-                error = -EIO;
-                goto bail;
         }
 
 out:    medusa_monitor_unlock(monitor);
@@ -888,6 +887,10 @@ __attribute__ ((visibility ("default"))) struct medusa_websocketclient * medusa_
         medusa_tcpsocket_connect_options.buffered               = 1;
         medusa_tcpsocket_connect_options.nodelay                = 1;
         medusa_tcpsocket_connect_options.nonblocking            = 1;
+        medusa_tcpsocket_connect_options.ssl                    = options->ssl;
+        medusa_tcpsocket_connect_options.ssl_ca_certificate     = options->ssl_ca_certificate;
+        medusa_tcpsocket_connect_options.ssl_privatekey         = options->ssl_privatekey;
+        medusa_tcpsocket_connect_options.ssl_verify             = options->ssl_verify;
         medusa_tcpsocket_connect_options.enabled                = options->enabled;
         medusa_tcpsocket_connect_options.onevent                = websocketclient_tcpsocket_onevent;
         medusa_tcpsocket_connect_options.context                = websocketclient;
@@ -897,11 +900,6 @@ __attribute__ ((visibility ("default"))) struct medusa_websocketclient * medusa_
                 goto bail;
         }
         websocketclient->tcpsocket = connected;
-        rc = medusa_tcpsocket_set_ssl_unlocked(websocketclient->tcpsocket, options->ssl);
-        if (rc < 0) {
-                error = - rc;
-                goto bail;
-        }
 
         return websocketclient;
 bail:   if (MEDUSA_IS_ERR_OR_NULL(websocketclient)) {

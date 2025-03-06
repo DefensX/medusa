@@ -11,30 +11,27 @@
 #endif
 
 #include <medusa/error.h>
+#include <medusa/url.h>
 #include <medusa/websocketclient.h>
 #include <medusa/monitor.h>
 
-#define OPTIONS_DEFAULT_ADDRESS                 "127.0.0.1"
-#define OPTIONS_DEFAULT_PORT                    12345
+#define OPTIONS_DEFAULT_URL                     "ws://127.0.0.1:80/path"
 #define OPTIONS_DEFAULT_MESSAGE                 "hello"
 #define OPTIONS_DEFAULT_CLIENT_READ_TIMEOUT     -1
 
 #define OPTION_HELP                     'h'
-#define OPTION_ADDRESS                  'a'
-#define OPTION_PORT                     'p'
+#define OPTION_URL                      'u'
 #define OPTION_MESSAGE                  'm'
 #define OPTION_READ_TIMEOUT             'r'
 
-static const char *g_option_address     = OPTIONS_DEFAULT_ADDRESS;
-static int g_option_port                = OPTIONS_DEFAULT_PORT;
+static const char *g_option_url         = OPTIONS_DEFAULT_URL;
 static const char *g_option_message     = OPTIONS_DEFAULT_MESSAGE;
 
 static int g_running = 0;
 
 static struct option longopts[] = {
         { "help",               no_argument,            NULL,        OPTION_HELP                },
-        { "address",            required_argument,      NULL,        OPTION_ADDRESS             },
-        { "port",               required_argument,      NULL,        OPTION_PORT                },
+        { "url",                required_argument,      NULL,        OPTION_URL                 },
         { "message",            required_argument,      NULL,        OPTION_MESSAGE             },
         { NULL,                 0,                      NULL,        0                          },
 };
@@ -47,12 +44,11 @@ static void usage (const char *pname)
         fprintf(stdout, "  %s [options]\n", pname);
         fprintf(stdout, "\n");
         fprintf(stdout, "options:\n");
-        fprintf(stdout, "  -a, --address            : address to connect (default: %s)\n", OPTIONS_DEFAULT_ADDRESS);
-        fprintf(stdout, "  -p, --port               : port to connect (default: %d)\n", OPTIONS_DEFAULT_PORT);
-        fprintf(stdout, "  -m, --message            : message to send (default: %s)\n", OPTIONS_DEFAULT_MESSAGE);
+        fprintf(stdout, "  -u, --url     : url to connect (default: %s)\n", OPTIONS_DEFAULT_URL);
+        fprintf(stdout, "  -m, --message : message to send (default: %s)\n", OPTIONS_DEFAULT_MESSAGE);
         fprintf(stdout, "\n");
         fprintf(stdout, "example:\n");
-        fprintf(stdout, "  %s -a 127.0.0.1 -p 12345\n", pname);
+        fprintf(stdout, "  %s -u ws://127.0.0.1:80/path\n", pname);
 }
 
 static int websocketclient_onevent (struct medusa_websocketclient *websocketclient, unsigned int events, void *context, void *param)
@@ -105,6 +101,7 @@ int main (int argc, char *argv[])
 
         struct medusa_websocketclient_connect_options websocketclient_connect_options;
         struct medusa_websocketclient *websocketclient;
+        struct medusa_url *url;
 
 #if defined(_WIN32)
         WSADATA wsaData;
@@ -116,9 +113,8 @@ int main (int argc, char *argv[])
 
         monitor = NULL;
 
-        g_option_address             = OPTIONS_DEFAULT_ADDRESS;
-        g_option_port                = OPTIONS_DEFAULT_PORT;
-        g_option_message             = OPTIONS_DEFAULT_MESSAGE;
+        g_option_url     = OPTIONS_DEFAULT_URL;
+        g_option_message = OPTIONS_DEFAULT_MESSAGE;
 
         _argv = malloc(sizeof(char *) * (argc + 1));
 
@@ -126,16 +122,13 @@ int main (int argc, char *argv[])
         for (_argc = 0; _argc < argc; _argc++) {
                 _argv[_argc] = argv[_argc];
         }
-        while ((c = getopt_long(_argc, _argv, "ha:p:r:m:", longopts, NULL)) != -1) {
+        while ((c = getopt_long(_argc, _argv, "hu:m:", longopts, NULL)) != -1) {
                 switch (c) {
                         case OPTION_HELP:
                                 usage(argv[0]);
                                 goto out;
-                        case OPTION_ADDRESS:
-                                g_option_address = optarg;
-                                break;
-                        case OPTION_PORT:
-                                g_option_port = atoi(optarg);
+                        case OPTION_URL:
+                                g_option_url = optarg;
                                 break;
                         case OPTION_MESSAGE:
                                 g_option_message = optarg;
@@ -152,14 +145,29 @@ int main (int argc, char *argv[])
                 goto bail;
         }
 
+        url = medusa_url_parse(g_option_url);
+        if (url == NULL) {
+                fprintf(stderr, "url is invalid\n");
+                goto bail;
+        }
+
         medusa_websocketclient_connect_options_default(&websocketclient_connect_options);
-        websocketclient_connect_options.monitor  = monitor;
-        websocketclient_connect_options.protocol = MEDUSA_WEBSOCKETCLIENT_PROTOCOL_ANY;
-        websocketclient_connect_options.address  = g_option_address;
-        websocketclient_connect_options.port     = g_option_port;
-        websocketclient_connect_options.enabled  = 0;
-        websocketclient_connect_options.onevent  = websocketclient_onevent;
-        websocketclient_connect_options.context  = NULL;
+        websocketclient_connect_options.monitor                 = monitor;
+        websocketclient_connect_options.protocol                = MEDUSA_WEBSOCKETCLIENT_PROTOCOL_ANY;
+        websocketclient_connect_options.address                 = medusa_url_get_host(url);
+        websocketclient_connect_options.port                    = medusa_url_get_port(url);
+        websocketclient_connect_options.server_path             = medusa_url_get_path(url);
+        websocketclient_connect_options.server_protocol         = "generic";
+        websocketclient_connect_options.ssl_certificate         = NULL;
+        websocketclient_connect_options.ssl_privatekey          = NULL;
+        websocketclient_connect_options.ssl_ca_certificate      = NULL;
+        websocketclient_connect_options.ssl_verify              = 0;
+        websocketclient_connect_options.ssl                     = (medusa_url_get_scheme(url) != NULL) &&
+                                                                  (strcasecmp(medusa_url_get_scheme(url), "wss") == 0 ||
+                                                                   strcasecmp(medusa_url_get_scheme(url), "https") == 0);
+        websocketclient_connect_options.enabled                 = 1;
+        websocketclient_connect_options.onevent                 = websocketclient_onevent;
+        websocketclient_connect_options.context                 = NULL;
 
         websocketclient = medusa_websocketclient_connect_with_options(&websocketclient_connect_options);
         if (MEDUSA_IS_ERR_OR_NULL(websocketclient)) {
