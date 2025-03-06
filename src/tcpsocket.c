@@ -2535,6 +2535,13 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 goto bail;
         }
 
+        tcpsocket = tcpsocket_create_unlocked(options->monitor, options->onevent, options->context);
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                ret = MEDUSA_PTR_ERR(tcpsocket);
+                line = __LINE__;
+                goto bail;
+        }
+
 #if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
         tcpsocket->ssl_hostname = strdup(address);
         if (tcpsocket->ssl_hostname == NULL) {
@@ -2544,12 +2551,6 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
         }
 #endif
 
-        tcpsocket = tcpsocket_create_unlocked(options->monitor, options->onevent, options->context);
-        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
-                ret = MEDUSA_PTR_ERR(tcpsocket);
-                line = __LINE__;
-                goto bail;
-        }
         tcpsocket_add_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_CONNECT);
         if (options->fd >= 0) {
                 tcpsocket_add_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_ATTACH);
