@@ -364,7 +364,6 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
                         "Connection: keep-alive, upgrade\r\n"
                         "Pragma: no-cache\r\n"
                         "Cache-Control: no-cache\r\n"
-                        "Upgrade: websocket\r\n"
                         "\r\n",
                         (websocketclient->sec_websocket_path) ? websocketclient->sec_websocket_path : "/",
                         websocketclient->host,
