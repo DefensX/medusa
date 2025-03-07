@@ -905,7 +905,8 @@ bail:   if (MEDUSA_IS_ERR_OR_NULL(websocketclient)) {
         websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR);
         websocketclient->error = -error;
         medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_ERROR, NULL);
-        return websocketclient;
+        medusa_websocketclient_destroy_unlocked(websocketclient);
+        return MEDUSA_ERR_PTR(error);
 }
 
 __attribute__ ((visibility ("default"))) struct medusa_websocketclient * medusa_websocketclient_connect_with_options (const struct medusa_websocketclient_connect_options *options)
