@@ -207,6 +207,7 @@ static int sender_medusa_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket, 
                         }
                 }
                 g_running = 0;
+                verbosef(0, "received: %s", option_string);
         }
 
         if (events & MEDUSA_TCPSOCKET_EVENT_DESTROY) {
@@ -404,6 +405,7 @@ int main (int argc, char *argv[])
                         err = MEDUSA_PTR_ERR(medusa_tcpsocket_wbuffer);
                         goto out;
                 }
+                verbosef(0, "sending: %s", option_string);
                 rc = medusa_buffer_append(medusa_tcpsocket_wbuffer, option_string, strlen(option_string) + 1);
                 if (rc != (int) strlen(option_string) + 1) {
                         fprintf(stderr, "can not append to tcpsocket write buffer\n");
