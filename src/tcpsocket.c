@@ -1199,11 +1199,10 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                         goto bail;
                                                 }
                                         }
-#if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
-#else
-                                        break;
-#endif
-                                 }
+                                        if (!medusa_tcpsocket_get_ssl_unlocked(tcpsocket)) {
+                                                break;
+                                        }
+                                }
                         }
                 } else {
                         medusa_errorf("state: %d is invalid", tcpsocket->state);
