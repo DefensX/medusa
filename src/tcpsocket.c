@@ -3160,7 +3160,7 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_enabled_unlock
 #endif
         if (enabled) {
                 if (medusa_tcpsocket_get_buffered_unlocked(tcpsocket) > 0 &&
-                    medusa_buffer_get_length(tcpsocket->wbuffer) > 0) {
+                    medusa_buffer_get_length(tcpsocket->rbuffer) > 0) {
                         rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ, NULL);
                         if (rc < 0) {
                                 return rc;
