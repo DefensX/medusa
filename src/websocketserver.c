@@ -1210,7 +1210,8 @@ static int websocketserver_client_tcpsocket_onevent (struct medusa_tcpsocket *tc
                 websocketserver_client->http_parser_settings.on_chunk_complete     = websocketserver_client_httpparser_on_chunk_complete;
                 http_parser_init(&websocketserver_client->http_parser, HTTP_REQUEST);
                 websocketserver_client->http_parser.data = websocketserver_client;
-        } else if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ) {
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ) {
                 if (websocketserver_client->state == MEDUSA_WEBSOCKETSERVER_CLIENT_STATE_ACCEPTED) {
                         rc = websocketserver_client_set_state(websocketserver_client, MEDUSA_WEBSOCKETSERVER_CLIENT_STATE_REQUEST_RECEIVING);
                         if (rc < 0) {
@@ -1529,7 +1530,8 @@ short_buffer:
                         ;
 
                 }
-        } else if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE) {
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE) {
                 struct medusa_tcpsocket_event_buffered_write *medusa_tcpsocket_event_buffered_write = (struct medusa_tcpsocket_event_buffered_write *) param;
                 struct medusa_websocketserver_client_event_buffered_write medusa_websocketserver_client_event_buffered_write;
                 medusa_websocketserver_client_event_buffered_write.length    = medusa_tcpsocket_event_buffered_write->length;
@@ -1540,14 +1542,16 @@ short_buffer:
                         error = rc;
                         goto bail;
                 }
-        } else if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE_FINISHED) {
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE_FINISHED) {
                 rc = medusa_websocketserver_client_onevent_unlocked(websocketserver_client, MEDUSA_WEBSOCKETSERVER_CLIENT_EVENT_BUFFERED_WRITE_FINISHED, NULL);
                 if (rc < 0) {
                         medusa_errorf("medusa_websocketserver_client_onevent_unlocked failed, rc: %d", rc);
                         error = rc;
                         goto bail;
                 }
-        } else if (events & MEDUSA_TCPSOCKET_EVENT_ERROR) {
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_ERROR) {
                 struct medusa_tcpsocket_event_error *medusa_tcpsocket_event_error = (struct medusa_tcpsocket_event_error *) param;
                 rc = websocketserver_client_set_state(websocketserver_client, MEDUSA_WEBSOCKETSERVER_CLIENT_STATE_ERROR);
                 if (rc < 0) {
@@ -1563,7 +1567,8 @@ short_buffer:
                         goto bail;
                 }
                 medusa_websocketserver_client_destroy_unlocked(websocketserver_client);
-        } else if (events & MEDUSA_TCPSOCKET_EVENT_DISCONNECTED) {
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_DISCONNECTED) {
                 rc = websocketserver_client_set_state(websocketserver_client, MEDUSA_WEBSOCKETSERVER_CLIENT_STATE_DISCONNECTED);
                 if (rc < 0) {
                         medusa_errorf("websocketserver_client_set_state failed, rc: %d", rc);
@@ -1577,11 +1582,6 @@ short_buffer:
                         goto bail;
                 }
                 medusa_websocketserver_client_destroy_unlocked(websocketserver_client);
-        } else if (events & MEDUSA_TCPSOCKET_EVENT_STATE_CHANGED) {
-        } else {
-                medusa_errorf("events: 0x%08x is invalid", events);
-                error = -EIO;
-                goto bail;
         }
 
 out:    medusa_monitor_unlock(monitor);

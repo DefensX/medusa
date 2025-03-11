@@ -10,6 +10,7 @@
 #include "../3rdparty/http-parser/http_parser.h"
 
 #include "strndup.h"
+#include "debug.h"
 #include "error.h"
 #include "pool.h"
 #include "base64.h"
@@ -323,6 +324,8 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
         struct medusa_monitor *monitor;
         struct medusa_websocketclient *websocketclient = (struct medusa_websocketclient *) context;
 
+        medusa_tracef("tcpsocket: %p, events: %08x, %s", tcpsocket, events, medusa_tcpsocket_event_string(events));
+
         if (events & MEDUSA_TCPSOCKET_EVENT_DESTROY) {
                 return 0;
         }
@@ -379,7 +382,8 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
                         }
                         goto out;
                 }
-        } else if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ) {
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ) {
                 if (websocketclient->state == MEDUSA_WEBSOCKETCLIENT_STATE_REQUEST_SENT) {
                         rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_RECEIVING_RESPONSE);
                         if (rc < 0) {
@@ -677,7 +681,8 @@ short_buffer:
                         ;
 
                 }
-        } else if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE) {
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE) {
                 if (websocketclient->state == MEDUSA_WEBSOCKETCLIENT_STATE_CONNECTED) {
                         struct medusa_tcpsocket_event_buffered_write *medusa_tcpsocket_event_buffered_write = (struct medusa_tcpsocket_event_buffered_write *) param;
                         struct medusa_websocketclient_event_buffered_write medusa_websocketclient_event_buffered_write;
@@ -689,7 +694,8 @@ short_buffer:
                                 goto bail;
                         }
                 }
-        } else if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE_FINISHED) {
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE_FINISHED) {
                 if (websocketclient->state == MEDUSA_WEBSOCKETCLIENT_STATE_SENDING_REQUEST) {
                         websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_REQUEST_SENT);
                         rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_REQUEST_SENT, NULL);
@@ -717,7 +723,8 @@ short_buffer:
                                 goto bail;
                         }
                 }
-        } else if (events & MEDUSA_TCPSOCKET_EVENT_ERROR) {
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_ERROR) {
                 struct medusa_tcpsocket_event_error *medusa_tcpsocket_event_error = (struct medusa_tcpsocket_event_error *) param;
                 rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR);
                 if (rc < 0) {
@@ -731,7 +738,8 @@ short_buffer:
                         goto bail;
                 }
                 medusa_websocketclient_destroy_unlocked(websocketclient);
-        } else if (events & MEDUSA_TCPSOCKET_EVENT_DISCONNECTED) {
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_DISCONNECTED) {
                 rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_DISCONNECTED);
                 if (rc < 0) {
                         error = rc;
@@ -743,7 +751,6 @@ short_buffer:
                         goto bail;
                 }
                 medusa_websocketclient_destroy_unlocked(websocketclient);
-        } else if (events & MEDUSA_TCPSOCKET_EVENT_STATE_CHANGED) {
         }
 
 out:    medusa_monitor_unlock(monitor);

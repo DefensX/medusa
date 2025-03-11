@@ -1213,35 +1213,39 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                 }
         }
         if (events & MEDUSA_IO_EVENT_ERR) {
-                struct medusa_tcpsocket_event_error medusa_tcpsocket_event_error;
-                medusa_tcpsocket_event_error.state = tcpsocket->state;
-                medusa_tcpsocket_event_error.error = EIO;
-                medusa_tcpsocket_event_error.line  = __LINE__;
-                rc = tcpsocket_set_state(tcpsocket, MEDUSA_TCPSOCKET_STATE_ERROR, medusa_tcpsocket_event_error.error, __LINE__);
-                if (rc < 0) {
-                        medusa_errorf("tcpsocket_set_state failed, rc: %d", rc);
-                        goto bail;
-                }
-                rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_ERROR, &medusa_tcpsocket_event_error);
-                if (rc < 0) {
-                        medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
-                        goto bail;
+                if (tcpsocket->state != MEDUSA_TCPSOCKET_STATE_ERROR) {
+                        struct medusa_tcpsocket_event_error medusa_tcpsocket_event_error;
+                        medusa_tcpsocket_event_error.state = tcpsocket->state;
+                        medusa_tcpsocket_event_error.error = EIO;
+                        medusa_tcpsocket_event_error.line  = __LINE__;
+                        rc = tcpsocket_set_state(tcpsocket, MEDUSA_TCPSOCKET_STATE_ERROR, medusa_tcpsocket_event_error.error, __LINE__);
+                        if (rc < 0) {
+                                medusa_errorf("tcpsocket_set_state failed, rc: %d", rc);
+                                goto bail;
+                        }
+                        rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_ERROR, &medusa_tcpsocket_event_error);
+                        if (rc < 0) {
+                                medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
+                                goto bail;
+                        }
                 }
         }
         if (events & MEDUSA_IO_EVENT_HUP) {
-                struct medusa_tcpsocket_event_error medusa_tcpsocket_event_error;
-                medusa_tcpsocket_event_error.state = tcpsocket->state;
-                medusa_tcpsocket_event_error.error = ECONNRESET;
-                medusa_tcpsocket_event_error.line  = __LINE__;
-                rc = tcpsocket_set_state(tcpsocket, MEDUSA_TCPSOCKET_STATE_ERROR, medusa_tcpsocket_event_error.error, __LINE__);
-                if (rc < 0) {
-                        medusa_errorf("tcpsocket_set_state failed, rc: %d", rc);
-                        goto bail;
-                }
-                rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_ERROR, &medusa_tcpsocket_event_error);
-                if (rc < 0) {
-                        medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
-                        goto bail;
+                if (tcpsocket->state != MEDUSA_TCPSOCKET_STATE_ERROR) {
+                        struct medusa_tcpsocket_event_error medusa_tcpsocket_event_error;
+                        medusa_tcpsocket_event_error.state = tcpsocket->state;
+                        medusa_tcpsocket_event_error.error = ECONNRESET;
+                        medusa_tcpsocket_event_error.line  = __LINE__;
+                        rc = tcpsocket_set_state(tcpsocket, MEDUSA_TCPSOCKET_STATE_ERROR, medusa_tcpsocket_event_error.error, __LINE__);
+                        if (rc < 0) {
+                                medusa_errorf("tcpsocket_set_state failed, rc: %d", rc);
+                                goto bail;
+                        }
+                        rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_ERROR, &medusa_tcpsocket_event_error);
+                        if (rc < 0) {
+                                medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
+                                goto bail;
+                        }
                 }
         }
         if (events & MEDUSA_IO_EVENT_DESTROY) {
