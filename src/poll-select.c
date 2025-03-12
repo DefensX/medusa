@@ -193,6 +193,10 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
                         continue;
                 }
                 io = internal->ios[i];
+                if (io == NULL) {
+                        medusa_errorf("io fd: %d is already destroyed", i);
+                        continue;
+                }
                 rc = internal->onevent(backend, io, events, internal->context, NULL);
                 if (rc < 0) {
                         medusa_errorf("internal->onevent failed, rc: %d", rc);

@@ -275,10 +275,12 @@ static int monitor_subject_onevent (struct medusa_monitor *monitor, struct medus
 {
         int rc;
         if (MEDUSA_IS_ERR_OR_NULL(monitor)) {
+                medusa_errorf("monitor: %p is invalid", monitor);
                 rc = -EINVAL;
                 goto bail;
         }
         if (MEDUSA_IS_ERR_OR_NULL(subject)) {
+                medusa_errorf("subject: %p is invalid", subject);
                 rc = -EINVAL;
                 goto bail;
         }
