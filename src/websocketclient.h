@@ -124,6 +124,30 @@ struct medusa_websocketclient_event_buffered_write {
         int64_t remaining;
 };
 
+enum {
+        MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_PARSER      = 0,
+        MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_TCPSOCKET   = 1
+#define MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_PARSER      MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_PARSER
+#define MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_TCPSOCKET   MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_TCPSOCKET
+};
+
+struct medusa_websocketclient_event_error {
+        unsigned int state;
+        unsigned int error;
+        unsigned int line;
+        unsigned int reason;
+        union {
+                struct {
+                        unsigned int state;
+                        unsigned int error;
+                        unsigned int line;
+                } tcpsocket;
+                struct {
+                        unsigned int error;
+                } parser;
+        } u;
+};
+
 #ifdef __cplusplus
 extern "C"
 {
