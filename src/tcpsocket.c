@@ -3126,9 +3126,6 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_enabled_unlock
         if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
                 return -EINVAL;
         }
-        if (medusa_tcpsocket_get_enabled_unlocked(tcpsocket) == !!enabled) {
-                return 0;
-        }
         if (enabled) {
                 tcpsocket_add_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_ENABLED);
         } else {

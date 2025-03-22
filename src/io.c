@@ -365,9 +365,6 @@ __attribute__ ((visibility ("default"))) int medusa_io_set_enabled_unlocked (str
         if (MEDUSA_IS_ERR_OR_NULL(io)) {
                 return -EINVAL;
         }
-        if (io_get_enabled(io) == !!enabled) {
-                return 0;
-        }
         io_set_enabled(io, !!enabled);
         return medusa_monitor_mod_unlocked(&io->subject);
 }
