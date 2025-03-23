@@ -283,13 +283,14 @@ int medusa_tcpsocket_ssl_set_SSL_CTX (struct medusa_tcpsocket *tcpsocket, struct
 struct ssl_ctx_st * medusa_tcpsocket_ssl_get_SSL_CTX (const struct medusa_tcpsocket *tcpsocket);
 
 int medusa_tcpsocket_get_fd (const struct medusa_tcpsocket *tcpsocket);
+struct medusa_io * medusa_tcpsocket_get_io (const struct medusa_tcpsocket *tcpsocket);
 struct medusa_buffer * medusa_tcpsocket_get_read_buffer (const struct medusa_tcpsocket *tcpsocket);
 struct medusa_buffer * medusa_tcpsocket_get_write_buffer (const struct medusa_tcpsocket *tcpsocket);
 
 int medusa_tcpsocket_set_events (struct medusa_tcpsocket *tcpsocket, unsigned int events);
 int medusa_tcpsocket_add_events (struct medusa_tcpsocket *tcpsocket, unsigned int events);
 int medusa_tcpsocket_del_events (struct medusa_tcpsocket *tcpsocket, unsigned int events);
-unsigned int medusa_tcpsocket_get_events (const struct medusa_tcpsocket *io);
+unsigned int medusa_tcpsocket_get_events (const struct medusa_tcpsocket *tcpsocket);
 
 int medusa_tcpsocket_get_protocol (struct medusa_tcpsocket *tcpsocket);
 int medusa_tcpsocket_get_sockport (struct medusa_tcpsocket *tcpsocket);

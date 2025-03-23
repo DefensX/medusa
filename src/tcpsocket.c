@@ -4774,6 +4774,26 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_fd (const stru
         return rc;
 }
 
+__attribute__ ((visibility ("default"))) struct medusa_io * medusa_tcpsocket_get_io_unlocked (const struct medusa_tcpsocket *tcpsocket)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
+        return tcpsocket->io;
+}
+
+__attribute__ ((visibility ("default"))) struct medusa_io * medusa_tcpsocket_get_io (const struct medusa_tcpsocket *tcpsocket)
+{
+        struct medusa_io *io;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        io = medusa_tcpsocket_get_io_unlocked(tcpsocket);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return io;
+}
+
 __attribute__ ((visibility ("default"))) struct medusa_buffer * medusa_tcpsocket_get_read_buffer_unlocked (const struct medusa_tcpsocket *tcpsocket)
 {
         if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
