@@ -403,10 +403,6 @@ static inline int tcpsocket_set_state (struct medusa_tcpsocket *tcpsocket, unsig
                         }
                 }
         } else if (state == MEDUSA_TCPSOCKET_STATE_CONNECTED) {
-                rc = medusa_tcpsocket_set_nodelay_unlocked(tcpsocket, tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_NODELAY));
-                if (rc < 0) {
-                        return rc;
-                }
                 if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->ltimer)) {
                         rc = medusa_timer_set_enabled_unlocked(tcpsocket->ltimer, 0);
                         if (rc < 0) {
@@ -547,6 +543,14 @@ static inline int tcpsocket_set_state (struct medusa_tcpsocket *tcpsocket, unsig
         pstate = tcpsocket->state;
         tcpsocket->error = error;
         tcpsocket->state = state;
+
+        if (tcpsocket->state == MEDUSA_TCPSOCKET_EVENT_LISTENING ||
+            tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTED) {
+                rc = medusa_tcpsocket_set_nodelay_unlocked(tcpsocket, tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_NODELAY));
+                if (rc < 0) {
+                        return rc;
+                }
+        }
 
         medusa_tcpsocket_event_state_changed.pstate = pstate;
         medusa_tcpsocket_event_state_changed.state  = tcpsocket->state;
@@ -3427,7 +3431,7 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_nodelay_unlock
                 tcpsocket_del_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_NODELAY);
         }
         if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->io) &&
-            tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTED) {
+            (tcpsocket->state == MEDUSA_TCPSOCKET_EVENT_LISTENING || tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTED)) {
                 int rc;
                 int on;
                 on = !!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_NODELAY);
