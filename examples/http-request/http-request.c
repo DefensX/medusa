@@ -14,7 +14,7 @@
 #include <medusa/monitor.h>
 
 #define OPTIONS_DEFAULT_URL             "http://127.0.0.1"
-#define OPTIONS_DEFAULT_METHOD          "post"
+#define OPTIONS_DEFAULT_METHOD          "get"
 #define OPTIONS_DEFAULT_DATA            NULL
 #define OPTIONS_DEFAULT_CONNECT_TIMEOUT 5.0
 #define OPTIONS_DEFAULT_READ_TIMEOUT    5.0

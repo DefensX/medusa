@@ -1,4 +1,6 @@
 
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -16,15 +18,18 @@
 
 #define OPTIONS_DEFAULT_ADDRESS                 "127.0.0.1"
 #define OPTIONS_DEFAULT_PORT                    12345
+#define OPTIONS_DEFAULT_FOLDER                  "./"
 #define OPTIONS_DEFAULT_CLIENT_READ_TIMEOUT     -1
 
 #define OPTION_HELP                     'h'
 #define OPTION_ADDRESS                  'a'
 #define OPTION_PORT                     'p'
+#define OPTIONS_FOLDER                  'f'
 #define OPTION_CLIENT_READ_TIMEOUT      'r'
 
 static const char *g_option_address     = OPTIONS_DEFAULT_ADDRESS;
 static int g_option_port                = OPTIONS_DEFAULT_PORT;
+static const char *g_option_folder      = OPTIONS_DEFAULT_FOLDER;
 static int g_option_client_read_timeout = OPTIONS_DEFAULT_CLIENT_READ_TIMEOUT;
 
 static int g_running = 0;
@@ -33,6 +38,7 @@ static struct option longopts[] = {
         { "help",               no_argument,            NULL,        OPTION_HELP                },
         { "address",            required_argument,      NULL,        OPTION_ADDRESS             },
         { "port",               required_argument,      NULL,        OPTION_PORT                },
+        { "folder"             ,required_argument,      NULL,        OPTIONS_FOLDER             },
         { "client-read-timeout",required_argument,      NULL,        OPTION_CLIENT_READ_TIMEOUT },
         { NULL,                 0,                      NULL,        0                          },
 };
@@ -47,6 +53,7 @@ static void usage (const char *pname)
         fprintf(stdout, "options:\n");
         fprintf(stdout, "  -a, --address            : address to run on (default: %s)\n", OPTIONS_DEFAULT_ADDRESS);
         fprintf(stdout, "  -p, --port               : port to run on (default: %d)\n", OPTIONS_DEFAULT_PORT);
+        fprintf(stdout, "  -f, --folder             : folder to serve (default: %s)\n", OPTIONS_DEFAULT_FOLDER);
         fprintf(stdout, "  -r, --client-read-timeout: client read timeout in milliseconds (default: %d)\n", OPTIONS_DEFAULT_CLIENT_READ_TIMEOUT);
         fprintf(stdout, "\n");
         fprintf(stdout, "example:\n");
@@ -111,27 +118,90 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
                                 medusa_httpserver_client_request_header_get_value(httpserver_client_request_header));
                 }
 
-                httpserver_client_request_body = medusa_httpserver_client_request_get_body(httpserver_client_request);
-                if (MEDUSA_IS_ERR_OR_NULL(httpserver_client_request_body)) {
-                        fprintf(stderr, "hettprequest reply body is invalid\n");
-                        goto bail;
-                }
-                fprintf(stderr, "body\n");
-                fprintf(stderr, "  length: %lld\n", (long long int) medusa_httpserver_client_request_body_get_length(httpserver_client_request_body));
-                fprintf(stderr, "  value : %.*s\n",
-                        (int) medusa_httpserver_client_request_body_get_length(httpserver_client_request_body),
-                        (char *) medusa_httpserver_client_request_body_get_value(httpserver_client_request_body));
+                if (strcasecmp(medusa_httpserver_client_request_get_method(httpserver_client_request), "GET") == 0) {
+                        int rc;
+                        FILE *fp = NULL;
+                        char *fn = NULL;
+                        rc = asprintf(&fn, "%s/%s", g_option_folder, medusa_httpserver_client_request_get_path(httpserver_client_request));
+                        if (rc < 0) {
+                                fprintf(stderr, "can not build file name\n");
+                                goto bail;
+                        }
+                        fp = fopen(fn, "rb");
+                        if (fp == NULL) {
+                                fprintf(stderr, "can not open file: %s\n", fn);
 
-                rc  = medusa_httpserver_client_reply_send_start(httpserver_client);
-                rc |= medusa_httpserver_client_reply_send_status(httpserver_client, "1.1", 200, "OK");
-                rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "key", "value");
-                rc |= medusa_httpserver_client_reply_send_headerf(httpserver_client, "Content-Length", "%d", (int) strlen("body"));
-                rc |= medusa_httpserver_client_reply_send_header(httpserver_client, NULL, NULL);
-                rc |= medusa_httpserver_client_reply_send_bodyf(httpserver_client, "body");
-                rc |= medusa_httpserver_client_reply_send_finish(httpserver_client);
-                if (rc != 0) {
-                        fprintf(stderr, "can not send httpserver client reply\n");
-                        goto bail;
+                                rc  = medusa_httpserver_client_reply_send_start(httpserver_client);
+                                rc |= medusa_httpserver_client_reply_send_status(httpserver_client, "1.1", 404, "Not Found");
+                                rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "key", "value");
+                                rc |= medusa_httpserver_client_reply_send_headerf(httpserver_client, "Content-Length", "%d", 0);
+                                rc |= medusa_httpserver_client_reply_send_header(httpserver_client, NULL, NULL);
+                                rc |= medusa_httpserver_client_reply_send_finish(httpserver_client);
+                                if (rc != 0) {
+                                        fprintf(stderr, "can not send httpserver client reply\n");
+                                        goto bail;
+                                }
+                        } else {
+                                rc  = medusa_httpserver_client_reply_send_start(httpserver_client);
+                                rc |= medusa_httpserver_client_reply_send_status(httpserver_client, "1.0", 200, "200");
+                                rc |= medusa_httpserver_client_reply_send_header(httpserver_client, NULL, NULL);
+
+                                while (1) {
+                                        int len;
+                                        char buf[1024];
+                                        len = fread(buf, 1, sizeof(buf), fp);
+                                        if (len < 0) {
+                                                fprintf(stderr, "can not read file: %s\n", fn);
+                                        } else if (len == 0) {
+                                                break;
+                                        } else {
+                                                rc |= medusa_httpserver_client_reply_send_body(httpserver_client, buf, len);
+                                        }
+                                }
+                                fclose(fp);
+
+                                rc |= medusa_httpserver_client_reply_send_finish(httpserver_client);
+                                if (rc != 0) {
+                                        fprintf(stderr, "can not send httpserver client reply\n");
+                                        free(fn);
+                                        goto bail;
+                                }
+                        }
+                        free(fn);
+                } else if (strcasecmp(medusa_httpserver_client_request_get_method(httpserver_client_request), "POST") == 0) {
+                        httpserver_client_request_body = medusa_httpserver_client_request_get_body(httpserver_client_request);
+                        if (MEDUSA_IS_ERR_OR_NULL(httpserver_client_request_body)) {
+                                fprintf(stderr, "hettprequest reply body is invalid\n");
+                                goto bail;
+                        }
+                        fprintf(stderr, "body\n");
+                        fprintf(stderr, "  length: %lld\n", (long long int) medusa_httpserver_client_request_body_get_length(httpserver_client_request_body));
+                        fprintf(stderr, "  value : %.*s\n",
+                                (int) medusa_httpserver_client_request_body_get_length(httpserver_client_request_body),
+                                (char *) medusa_httpserver_client_request_body_get_value(httpserver_client_request_body));
+
+                        rc  = medusa_httpserver_client_reply_send_start(httpserver_client);
+                        rc |= medusa_httpserver_client_reply_send_status(httpserver_client, "1.1", 200, "OK");
+                        rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "key", "value");
+                        rc |= medusa_httpserver_client_reply_send_headerf(httpserver_client, "Content-Length", "%d", (int) strlen("OK"));
+                        rc |= medusa_httpserver_client_reply_send_header(httpserver_client, NULL, NULL);
+                        rc |= medusa_httpserver_client_reply_send_bodyf(httpserver_client, "OK");
+                        rc |= medusa_httpserver_client_reply_send_finish(httpserver_client);
+                        if (rc != 0) {
+                                fprintf(stderr, "can not send httpserver client reply\n");
+                                goto bail;
+                        }
+                } else {
+                        rc  = medusa_httpserver_client_reply_send_start(httpserver_client);
+                        rc |= medusa_httpserver_client_reply_send_status(httpserver_client, "1.1", 500, "Internal Server Error");
+                        rc |= medusa_httpserver_client_reply_send_headerf(httpserver_client, "Content-Length", "%d", (int) strlen("Internal Server Error"));
+                        rc |= medusa_httpserver_client_reply_send_header(httpserver_client, NULL, NULL);
+                        rc |= medusa_httpserver_client_reply_send_bodyf(httpserver_client, "Internal Server Error");
+                        rc |= medusa_httpserver_client_reply_send_finish(httpserver_client);
+                        if (rc != 0) {
+                                fprintf(stderr, "can not send httpserver client reply\n");
+                                goto bail;
+                        }
                 }
         } else if (events & MEDUSA_HTTPSERVER_CLIENT_EVENT_REQUEST_RECEIVE_TIMEOUT) {
                 medusa_httpserver_client_destroy(httpserver_client);
@@ -213,6 +283,7 @@ int main (int argc, char *argv[])
 
         g_option_address             = OPTIONS_DEFAULT_ADDRESS;
         g_option_port                = OPTIONS_DEFAULT_PORT;
+        g_option_folder              = OPTIONS_DEFAULT_FOLDER;
         g_option_client_read_timeout = OPTIONS_DEFAULT_CLIENT_READ_TIMEOUT;
 
         _argv = malloc(sizeof(char *) * (argc + 1));
@@ -221,7 +292,7 @@ int main (int argc, char *argv[])
         for (_argc = 0; _argc < argc; _argc++) {
                 _argv[_argc] = argv[_argc];
         }
-        while ((c = getopt_long(_argc, _argv, "ha:p:r:", longopts, NULL)) != -1) {
+        while ((c = getopt_long(_argc, _argv, "ha:p:r:f:", longopts, NULL)) != -1) {
                 switch (c) {
                         case OPTION_HELP:
                                 usage(argv[0]);
@@ -231,6 +302,9 @@ int main (int argc, char *argv[])
                                 break;
                         case OPTION_PORT:
                                 g_option_port = atoi(optarg);
+                                break;
+                        case OPTIONS_FOLDER:
+                                g_option_folder = optarg;
                                 break;
                         case OPTION_CLIENT_READ_TIMEOUT:
                                 g_option_client_read_timeout = atoi(optarg);
