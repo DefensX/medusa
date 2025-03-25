@@ -1527,6 +1527,7 @@ __attribute__ ((visibility ("default"))) int medusa_httprequest_make_request_unl
         medusa_tcpsocket_connect_options.connect_timeout = httprequest->connect_timeout;
         medusa_tcpsocket_connect_options.read_timeout    = httprequest->read_timeout;
         medusa_tcpsocket_connect_options.nonblocking     = 1;
+        medusa_tcpsocket_connect_options.nodelay         = 1;
         medusa_tcpsocket_connect_options.buffered        = 1;
         medusa_tcpsocket_connect_options.enabled         = 1;
         httprequest->tcpsocket = medusa_tcpsocket_connect_with_options_unlocked(&medusa_tcpsocket_connect_options);
