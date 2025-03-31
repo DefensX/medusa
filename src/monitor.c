@@ -1629,14 +1629,6 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_run_timeout (struct 
                 return -EINVAL;
         }
 
-        if (timeout < 0) {
-                timespec = NULL;
-        } else {
-                timespec = &_timespec;
-                timespec->tv_sec = timeout;
-                timespec->tv_nsec = (timeout - timespec->tv_sec) * 1e9;
-        }
-
         medusa_monitor_lock(monitor);
 
         rc = monitor_process_deletes(monitor);
@@ -1651,6 +1643,22 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_run_timeout (struct 
         if (rc < 0) {
                 goto bail;
         }
+
+        if (monitor->wakeup.fired != 0) {
+                timeout = 0;
+        }
+        if (timeout < 0) {
+                timespec = NULL;
+        } else if (timeout == 0) {
+                timespec = &_timespec;
+                timespec->tv_sec  = 0;
+                timespec->tv_nsec = 0;
+        } else {
+                timespec = &_timespec;
+                timespec->tv_sec  = timeout;
+                timespec->tv_nsec = (timeout - timespec->tv_sec) * 1e9;
+        }
+
         medusa_monitor_unlock(monitor);
 
         if (monitor->timer.backend->fd == NULL && monitor->timer.valid == 1) {
