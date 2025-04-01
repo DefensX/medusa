@@ -908,21 +908,37 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                 int64_t niovecs;
                                 struct medusa_iovec iovec;
                                 while (1) {
-                                        niovecs = medusa_buffer_peekv(tcpsocket->wbuffer, 0, -1, &iovec, 1);
-                                        if (niovecs < 0) {
-                                                medusa_errorf("medusa_buffer_peekv failed, niovecs: %d", (int) niovecs);
-                                                goto bail;
-                                        }
-                                        if (niovecs == 0) {
-                                                break;
-                                        }
 #if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
+                                        if (tcpsocket->ssl != NULL && tcpsocket->ssl_wperror != 0) {
+                                                iovec.iov_base = tcpsocket->ssl_wbuffer;
+                                                iovec.iov_len  = tcpsocket->ssl_wlength;
+                                                niovecs = 1;
+                                        } else {
+#endif
+                                                niovecs = medusa_buffer_peekv(tcpsocket->wbuffer, 0, -1, &iovec, 1);
+                                                if (niovecs < 0) {
+                                                        medusa_errorf("medusa_buffer_peekv failed, niovecs: %d", (int) niovecs);
+                                                        goto bail;
+                                                }
+                                                if (niovecs == 0) {
+                                                        break;
+                                                }
+#if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
+                                        }
                                         if (tcpsocket->ssl != NULL) {
+                                                if (tcpsocket->ssl_wperror == SSL_ERROR_NONE) {
+                                                        iovec.iov_len = MIN(iovec.iov_len, sizeof(tcpsocket->ssl_wbuffer));
+                                                }
                                                 ERR_clear_error();
                                                 wlength = SSL_write(tcpsocket->ssl, iovec.iov_base, iovec.iov_len);
                                                 if (wlength <= 0) {
                                                         int error;
                                                         error = SSL_get_error(tcpsocket->ssl, wlength);
+                                                        if (tcpsocket->ssl_wperror == SSL_ERROR_NONE) {
+                                                                memcpy(tcpsocket->ssl_wbuffer, iovec.iov_base, iovec.iov_len);
+                                                                tcpsocket->ssl_wlength = iovec.iov_len;
+                                                                tcpsocket->ssl_wperror = error;
+                                                        }
                                                         if (error == SSL_ERROR_WANT_READ) {
                                                                 wlength = -1;
                                                                 errno = EAGAIN;
@@ -956,6 +972,9 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                                 wlength = -1;
                                                                 errno = EIO;
                                                         }
+                                                } else if (tcpsocket->ssl_wperror != SSL_ERROR_NONE) {
+                                                        tcpsocket->ssl_wperror = SSL_ERROR_NONE;
+                                                        tcpsocket->ssl_wlength = 0;
                                                 }
                                                 if (!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK) &&
                                                     SSL_get_state(tcpsocket->ssl) == TLS_ST_OK) {
@@ -1015,11 +1034,11 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                 struct medusa_tcpsocket_event_buffered_write medusa_tcpsocket_event_buffered_write;
                                                 clength = medusa_buffer_choke(tcpsocket->wbuffer, 0, wlength);
                                                 if (clength < 0) {
-                                                        medusa_errorf("medusa_buffer_choke failed, clength: %d", (int) clength);
+                                                        medusa_errorf("medusa_buffer_choke failed, clength: %d, wlength: %d, blength: %d", (int) clength, (int) wlength, (int) medusa_buffer_get_length(tcpsocket->wbuffer));
                                                         goto bail;
                                                 }
                                                 if (clength != wlength) {
-                                                        medusa_errorf("medusa_buffer_choke failed, clength: %d, wlength: %d", (int) clength, (int) wlength);
+                                                        medusa_errorf("medusa_buffer_choke failed, clength: %d, wlength: %d, blength: %d", (int) clength, (int) wlength, (int) medusa_buffer_get_length(tcpsocket->wbuffer));
                                                         goto bail;
                                                 }
                                                 medusa_tcpsocket_event_buffered_write.length    = wlength;
@@ -4287,6 +4306,7 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_unlocked (
 #if (OPENSSL_VERSION_NUMBER >= 0x10100000L) || (OPENSSL_API_COMPAT >= 0x10100000L)
                         (void) SSL_CTX_set_ecdh_auto(tcpsocket->ssl_ctx, 1);
 #endif
+                        SSL_CTX_set_mode(tcpsocket->ssl_ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
                 }
                 if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->ssl_ctx)) {
                         if (!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_BIND)) {

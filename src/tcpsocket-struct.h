@@ -30,6 +30,9 @@ struct medusa_tcpsocket {
         int ssl_wantread;
         int ssl_wantwrite;
         char *ssl_hostname;
+        char ssl_wbuffer[64 * 1024];
+        int ssl_wlength;
+        int ssl_wperror;
 #endif
         void *userdata;
 };
