@@ -1010,6 +1010,7 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                 }
                         } else {
                                 int n;
+                                int64_t blength;
                                 int64_t clength;
                                 int64_t rlength;
                                 int64_t niovecs;
@@ -1026,6 +1027,20 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                 if (n < 0) {
                                         medusa_errorf("ioctl failed, n: %d", n);
                                         goto bail;
+                                }
+                                if (tcpsocket->rbuffer_limit > 0) {
+                                        blength = medusa_buffer_get_length(tcpsocket->rbuffer);
+                                        if (blength < 0) {
+                                                medusa_errorf("can not get read buffer length");
+                                                goto bail;
+                                        }
+                                        if (blength >= tcpsocket->rbuffer_limit) {
+                                                medusa_errorf("read buffer limit reached, this should not happen");
+                                                goto bail;
+                                                n = 0;
+                                        } else {
+                                                n = tcpsocket->rbuffer_limit - blength;
+                                        }
                                 }
                                 while (1) {
                                         niovecs = medusa_buffer_reservev(tcpsocket->rbuffer, n, &iovec, 1);
@@ -1599,6 +1614,16 @@ ipv6:
                 ret = rc;
                 goto bail;
         }
+        rc = medusa_tcpsocket_set_buffered_read_limit_unlocked(tcpsocket, options->buffered_read_limit);
+        if (rc < 0) {
+                ret = rc;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_buffered_write_limit_unlocked(tcpsocket, options->buffered_write_limit);
+        if (rc < 0) {
+                ret = rc;
+                goto bail;
+        }
         rc = medusa_tcpsocket_set_clodestroy_unlocked(tcpsocket, options->clodestroy);
         if (rc < 0) {
                 ret = rc;
@@ -1817,6 +1842,16 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 goto bail;
         }
         rc = medusa_tcpsocket_set_buffered_unlocked(accepted, options->buffered);
+        if (rc < 0) {
+                ret = rc;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_buffered_read_limit_unlocked(tcpsocket, options->buffered_read_limit);
+        if (rc < 0) {
+                ret = rc;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_buffered_write_limit_unlocked(tcpsocket, options->buffered_write_limit);
         if (rc < 0) {
                 ret = rc;
                 goto bail;
@@ -2470,6 +2505,18 @@ bind_ipv6:
                 ret = rc;
                 goto bail;
         }
+        rc = medusa_tcpsocket_set_buffered_read_limit_unlocked(tcpsocket, options->buffered_read_limit);
+        if (rc < 0) {
+                medusa_errorf("can not set buffered read limit option for tcpsocket");
+                ret = rc;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_buffered_write_limit_unlocked(tcpsocket, options->buffered_write_limit);
+        if (rc < 0) {
+                medusa_errorf("can not set buffered write limit option for tcpsocket");
+                ret = rc;
+                goto bail;
+        }
         rc = medusa_tcpsocket_set_clodestroy_unlocked(tcpsocket, options->clodestroy);
         if (rc < 0) {
                 medusa_errorf("can not set clodestroy option for tcpsocket");
@@ -2582,6 +2629,18 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 goto bail;
         }
         rc = medusa_tcpsocket_set_buffered_unlocked(tcpsocket, options->buffered);
+        if (rc < 0) {
+                ret = rc;
+                line = __LINE__;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_buffered_read_limit_unlocked(tcpsocket, options->buffered_read_limit);
+        if (rc < 0) {
+                ret = rc;
+                line = __LINE__;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_buffered_write_limit_unlocked(tcpsocket, options->buffered_write_limit);
         if (rc < 0) {
                 ret = rc;
                 line = __LINE__;
@@ -2935,6 +2994,16 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 goto bail;
         }
         rc = medusa_tcpsocket_set_buffered_unlocked(tcpsocket, options->buffered);
+        if (rc < 0) {
+                ret = rc;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_buffered_read_limit_unlocked(tcpsocket, options->buffered_read_limit);
+        if (rc < 0) {
+                ret = rc;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_buffered_write_limit_unlocked(tcpsocket, options->buffered_write_limit);
         if (rc < 0) {
                 ret = rc;
                 goto bail;
@@ -3301,6 +3370,100 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_buffered (cons
         }
         medusa_monitor_lock(tcpsocket->subject.monitor);
         rc = medusa_tcpsocket_get_buffered_unlocked(tcpsocket);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_buffered_read_limit_unlocked (struct medusa_tcpsocket *tcpsocket, int limit)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        if (!tcpsocket_get_buffered(tcpsocket)) {
+                return -EINVAL;
+        }
+        tcpsocket->rbuffer_limit = limit;
+        return 0;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_buffered_read_limit (struct medusa_tcpsocket *tcpsocket, int limit)
+{
+        int rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_set_buffered_read_limit_unlocked(tcpsocket, limit);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_buffered_read_limit_unlocked (const struct medusa_tcpsocket *tcpsocket)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        if (!tcpsocket_get_buffered(tcpsocket)) {
+                return -EINVAL;
+        }
+        return tcpsocket->rbuffer_limit;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_buffered_read_limit (const struct medusa_tcpsocket *tcpsocket)
+{
+        int rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_get_buffered_read_limit_unlocked(tcpsocket);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_buffered_write_limit_unlocked (struct medusa_tcpsocket *tcpsocket, int limit)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        if (!tcpsocket_get_buffered(tcpsocket)) {
+                return -EINVAL;
+        }
+        tcpsocket->wbuffer_limit = limit;
+        return 0;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_buffered_write_limit (struct medusa_tcpsocket *tcpsocket, int limit)
+{
+        int rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_set_buffered_write_limit_unlocked(tcpsocket, limit);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_buffered_write_limit_unlocked (const struct medusa_tcpsocket *tcpsocket)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        if (!tcpsocket_get_buffered(tcpsocket)) {
+                return -EINVAL;
+        }
+        return tcpsocket->wbuffer_limit;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_buffered_write_limit (const struct medusa_tcpsocket *tcpsocket)
+{
+        int rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_get_buffered_write_limit_unlocked(tcpsocket);
         medusa_monitor_unlock(tcpsocket->subject.monitor);
         return rc;
 }
@@ -5126,12 +5289,13 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_onevent_unlocked (
                     (tcpsocket_get_buffered(tcpsocket) > 0) &&
                     (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->io))) {
                         int rc;
-                        int64_t blength;
-                        blength = medusa_buffer_get_length(tcpsocket->wbuffer);
-                        if (blength < 0) {
-                                ret = blength;
+                        int64_t wblength;
+                        int64_t rblength;
+                        wblength = medusa_buffer_get_length(tcpsocket->wbuffer);
+                        if (wblength < 0) {
+                                ret = wblength;
                                 goto out;
-                        } else if (blength == 0) {
+                        } else if (wblength == 0) {
                                 rc = medusa_io_del_events_unlocked(tcpsocket->io, MEDUSA_IO_EVENT_OUT);
                                 if (rc < 0) {
                                         ret = rc;
@@ -5144,10 +5308,22 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_onevent_unlocked (
                                         goto out;
                                 }
                         }
-                        rc = medusa_io_add_events_unlocked(tcpsocket->io, MEDUSA_IO_EVENT_IN);
-                        if (rc < 0) {
-                                ret = rc;
+                        rblength = medusa_buffer_get_length(tcpsocket->rbuffer);
+                        if (rblength < 0) {
+                                ret = rblength;
                                 goto out;
+                        } else if (tcpsocket->rbuffer_limit == 0 || rblength < tcpsocket->rbuffer_limit) {
+                                rc = medusa_io_add_events_unlocked(tcpsocket->io, MEDUSA_IO_EVENT_IN);
+                                if (rc < 0) {
+                                        ret = rc;
+                                        goto out;
+                                }
+                        } else {
+                                rc = medusa_io_del_events_unlocked(tcpsocket->io, MEDUSA_IO_EVENT_IN);
+                                if (rc < 0) {
+                                        ret = rc;
+                                        goto out;
+                                }
                         }
                 }
         }

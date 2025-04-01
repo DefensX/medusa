@@ -25,6 +25,12 @@ int medusa_tcpsocket_get_enabled_unlocked (const struct medusa_tcpsocket *tcpsoc
 int medusa_tcpsocket_set_buffered_unlocked (struct medusa_tcpsocket *tcpsocket, int enabled);
 int medusa_tcpsocket_get_buffered_unlocked (const struct medusa_tcpsocket *tcpsocket);
 
+int medusa_tcpsocket_set_buffered_read_limit_unlocked (struct medusa_tcpsocket *tcpsocket, int limit);
+int medusa_tcpsocket_get_buffered_read_limit_unlocked (const struct medusa_tcpsocket *tcpsocket);
+
+int medusa_tcpsocket_set_buffered_write_limit_unlocked (struct medusa_tcpsocket *tcpsocket, int limit);
+int medusa_tcpsocket_get_buffered_write_limit_unlocked (const struct medusa_tcpsocket *tcpsocket);
+
 int medusa_tcpsocket_set_clodestroy_unlocked (struct medusa_tcpsocket *tcpsocket, int enabled);
 int medusa_tcpsocket_get_clodestroy_unlocked (const struct medusa_tcpsocket *tcpsocket);
 

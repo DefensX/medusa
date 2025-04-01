@@ -19,6 +19,8 @@ struct medusa_tcpsocket {
         struct medusa_timer *wtimer;
         struct medusa_buffer *wbuffer;
         struct medusa_buffer *rbuffer;
+        int wbuffer_limit;
+        int rbuffer_limit;
 #if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
         SSL *ssl;
         SSL_CTX *ssl_ctx;

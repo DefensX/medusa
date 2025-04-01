@@ -111,6 +111,8 @@ struct medusa_tcpsocket_bind_options {
         int nodelay;
         int backlog;
         int buffered;
+        int buffered_read_limit;
+        int buffered_write_limit;
         int ssl;
         const char *ssl_certificate;
         const char *ssl_privatekey;
@@ -127,6 +129,8 @@ struct medusa_tcpsocket_accept_options {
         int nonblocking;
         int nodelay;
         int buffered;
+        int buffered_read_limit;
+        int buffered_write_limit;
         int enabled;
 };
 
@@ -151,6 +155,8 @@ struct medusa_tcpsocket_connect_options {
         int nonblocking;
         int nodelay;
         int buffered;
+        int buffered_read_limit;
+        int buffered_write_limit;
         int ssl;
         const char *ssl_certificate;
         const char *ssl_privatekey;
@@ -169,6 +175,8 @@ struct medusa_tcpsocket_attach_options {
         int nonblocking;
         int nodelay;
         int buffered;
+        int buffered_read_limit;
+        int buffered_write_limit;
         int enabled;
 };
 
@@ -224,6 +232,12 @@ int medusa_tcpsocket_disable (struct medusa_tcpsocket *tcpsocket);
 
 int medusa_tcpsocket_set_buffered (struct medusa_tcpsocket *tcpsocket, int enabled);
 int medusa_tcpsocket_get_buffered (const struct medusa_tcpsocket *tcpsocket);
+
+int medusa_tcpsocket_set_buffered_read_limit (struct medusa_tcpsocket *tcpsocket, int limit);
+int medusa_tcpsocket_get_buffered_read_limit (const struct medusa_tcpsocket *tcpsocket);
+
+int medusa_tcpsocket_set_buffered_write_limit (struct medusa_tcpsocket *tcpsocket, int limit);
+int medusa_tcpsocket_get_buffered_write_limit (const struct medusa_tcpsocket *tcpsocket);
 
 int medusa_tcpsocket_set_clodestroy (struct medusa_tcpsocket *tcpsocket, int enabled);
 int medusa_tcpsocket_get_clodestroy (const struct medusa_tcpsocket *tcpsocket);
