@@ -25,8 +25,10 @@ enum {
 
 enum {
         MEDUSA_BUFFER_EVENT_WRITE               = (1 <<  0), /* 0x00000001 */
-        MEDUSA_BUFFER_EVENT_DESTROY             = (1 <<  1), /* 0x00000002 */
+        MEDUSA_BUFFER_EVENT_CHOKE               = (1 <<  1), /* 0x00000002 */
+        MEDUSA_BUFFER_EVENT_DESTROY             = (1 <<  2), /* 0x00000004 */
 #define MEDUSA_BUFFER_EVENT_WRITE               MEDUSA_BUFFER_EVENT_WRITE
+#define MEDUSA_BUFFER_EVENT_CHOKE               MEDUSA_BUFFER_EVENT_CHOKE
 #define MEDUSA_BUFFER_EVENT_DESTROY             MEDUSA_BUFFER_EVENT_DESTROY
 };
 

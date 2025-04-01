@@ -555,6 +555,8 @@ __attribute__ ((visibility ("default"))) int64_t medusa_buffer_peekv (const stru
 
 __attribute__ ((visibility ("default"))) int64_t medusa_buffer_choke (struct medusa_buffer *buffer, int64_t offset, int64_t length)
 {
+        int rc;
+        int ret;
         if (MEDUSA_IS_ERR_OR_NULL(buffer)) {
                 return -EINVAL;
         }
@@ -564,7 +566,18 @@ __attribute__ ((visibility ("default"))) int64_t medusa_buffer_choke (struct med
         if (MEDUSA_IS_ERR_OR_NULL(buffer->backend->choke)) {
                 return -EINVAL;
         }
-        return buffer->backend->choke(buffer, offset, length);
+        ret = buffer->backend->choke(buffer, offset, length);
+        if (ret < 0) {
+                return ret;
+        }
+        if (ret > 0) {
+                rc = buffer_onevent(buffer, MEDUSA_BUFFER_EVENT_CHOKE, NULL);
+                if (rc != 0) {
+                        medusa_errorf("buffer_onevent failed, rc: %d", rc);
+                        return rc;
+                }
+        }
+        return ret;
 }
 
 __attribute__ ((visibility ("default"))) void * medusa_buffer_linearize (struct medusa_buffer *buffer, int64_t offset, int64_t length)
@@ -1533,6 +1546,7 @@ __attribute__ ((visibility ("default"))) void medusa_buffer_destroy (struct medu
 __attribute__ ((visibility ("default"))) const char * medusa_buffer_event_string (unsigned int events)
 {
         if (events == MEDUSA_BUFFER_EVENT_WRITE)        return "MEDUSA_BUFFER_EVENT_WRITE";
+        if (events == MEDUSA_BUFFER_EVENT_CHOKE)        return "MEDUSA_BUFFER_EVENT_CHOKE";
         if (events == MEDUSA_BUFFER_EVENT_DESTROY)      return "MEDUSA_BUFFER_EVENT_DESTROY";
         return "MEDUSA_BUFFER_EVENT_UNKNOWN";
 }
