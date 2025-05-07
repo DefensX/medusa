@@ -18,6 +18,7 @@ struct medusa_httprequest {
         http_parser http_parser;
         http_parser_settings http_parser_settings;
         struct medusa_httprequest_reply *reply;
+        int onevent_error;
         void *userdata;
 };
 
