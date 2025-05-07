@@ -1804,7 +1804,6 @@ __attribute__ ((visibility ("default"))) int medusa_httprequest_onevent_unlocked
                 free(httprequest);
 #endif
         }
-        medusa_errorf("ret: %d", ret);
         return ret;
 }
 
