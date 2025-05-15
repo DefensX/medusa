@@ -130,25 +130,29 @@ static int client_medusa_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket, 
                 for (rlen = 0, i = 0; i < niovecs; i++) {
                         rlen += iovecs[i].iov_len;
                 }
-                wbuffer = medusa_tcpsocket_get_write_buffer(tcpsocket);
-                if (wbuffer == NULL) {
-                        errorf("medusa_tcpsocket_get_write_buffer failed");
-                        return MEDUSA_PTR_ERR(wbuffer);
+                if (g_echo) {
+                        wbuffer = medusa_tcpsocket_get_write_buffer(tcpsocket);
+                        if (wbuffer == NULL) {
+                                errorf("medusa_tcpsocket_get_write_buffer failed");
+                                return MEDUSA_PTR_ERR(wbuffer);
+                        }
+                        wlen = medusa_buffer_appendv(wbuffer, iovecs, niovecs);
+                        if (wlen < 0) {
+                                errorf("medusa_buffer_appendv failed");
+                                return wlen;
+                        }
+                        if (wlen != rlen) {
+                                errorf("medusa_buffer_appendv failed");
+                                return -EIO;
+                        }
                 }
-                wlen = medusa_buffer_appendv(wbuffer, iovecs, niovecs);
-                if (wlen < 0) {
-                        errorf("medusa_buffer_appendv failed");
-                        return wlen;
+                {
+                        char *rdata;
+                        rdata = medusa_buffer_linearize(rbuffer, 0, rlen);
+                        fprintf(stdout, "%.*s", (int) rlen, rdata);
+                        fflush(stdout);
                 }
-                if (wlen != rlen) {
-                        errorf("medusa_buffer_appendv failed");
-                        return -EIO;
-                }
-                char *wdata;
-                wdata = medusa_buffer_linearize(rbuffer, 0, wlen);
-                fprintf(stdout, "%.*s", (int) wlen, wdata);
-                fflush(stdout);
-                rc = medusa_buffer_choke(rbuffer, 0, wlen);
+                rc = medusa_buffer_choke(rbuffer, 0, rlen);
                 if (rc < 0) {
                         errorf("medusa_buffer_choke failed");
                         return rc;
@@ -449,6 +453,7 @@ int main (int argc, char *argv[])
                 err = -EINVAL;
                 goto out;
         }
+        debugf("echo: %d", g_echo);
 
         while (g_running == 1) {
                 debugf("loop");

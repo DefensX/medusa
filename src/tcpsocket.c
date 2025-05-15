@@ -1708,15 +1708,17 @@ ipv6:
                 ret = rc;
                 goto bail;
         }
-        rc = medusa_tcpsocket_set_buffered_read_limit_unlocked(tcpsocket, options->buffered_read_limit);
-        if (rc < 0) {
-                ret = rc;
-                goto bail;
-        }
-        rc = medusa_tcpsocket_set_buffered_write_limit_unlocked(tcpsocket, options->buffered_write_limit);
-        if (rc < 0) {
-                ret = rc;
-                goto bail;
+        if (medusa_tcpsocket_get_buffered_unlocked(tcpsocket)) {
+                rc = medusa_tcpsocket_set_buffered_read_limit_unlocked(tcpsocket, options->buffered_read_limit);
+                if (rc < 0) {
+                        ret = rc;
+                        goto bail;
+                }
+                rc = medusa_tcpsocket_set_buffered_write_limit_unlocked(tcpsocket, options->buffered_write_limit);
+                if (rc < 0) {
+                        ret = rc;
+                        goto bail;
+                }
         }
         rc = medusa_tcpsocket_set_clodestroy_unlocked(tcpsocket, options->clodestroy);
         if (rc < 0) {
@@ -1940,15 +1942,17 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 ret = rc;
                 goto bail;
         }
-        rc = medusa_tcpsocket_set_buffered_read_limit_unlocked(tcpsocket, options->buffered_read_limit);
-        if (rc < 0) {
-                ret = rc;
-                goto bail;
-        }
-        rc = medusa_tcpsocket_set_buffered_write_limit_unlocked(tcpsocket, options->buffered_write_limit);
-        if (rc < 0) {
-                ret = rc;
-                goto bail;
+        if (medusa_tcpsocket_get_buffered_unlocked(accepted)) {
+                rc = medusa_tcpsocket_set_buffered_read_limit_unlocked(accepted, options->buffered_read_limit);
+                if (rc < 0) {
+                        ret = rc;
+                        goto bail;
+                }
+                rc = medusa_tcpsocket_set_buffered_write_limit_unlocked(accepted, options->buffered_write_limit);
+                if (rc < 0) {
+                        ret = rc;
+                        goto bail;
+                }
         }
         rc = medusa_tcpsocket_set_clodestroy_unlocked(accepted, options->clodestroy);
         if (rc < 0) {
