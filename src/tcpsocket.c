@@ -3711,7 +3711,9 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_nodelay_unlock
                 on = !!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_NODELAY);
                 rc = setsockopt(medusa_io_get_fd_unlocked(tcpsocket->io), IPPROTO_TCP, TCP_NODELAY, (void *) &on, sizeof(on));
                 if (rc != 0) {
-                        return -errno;
+                        if (errno != EOPNOTSUPP) {
+                                return -errno;
+                        }
                 }
         }
         return 0;
