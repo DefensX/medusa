@@ -18,20 +18,20 @@
 
 #include "signal-null.h"
 
-TAILQ_HEAD(entries, entry);
-struct entry {
-        TAILQ_ENTRY(entry) list;
+TAILQ_HEAD(items, item);
+struct item {
+        TAILQ_ENTRY(item) list;
         struct medusa_signal *signal;
 };
 
 struct internal {
         struct medusa_signal_backend backend;
-        struct entries entries;
+        struct items items;
 };
 
 static int internal_add (struct medusa_signal_backend *backend, struct medusa_signal *signal)
 {
-        struct entry *entry;
+        struct item *item;
         struct internal *internal = (struct internal *) backend;
         if (MEDUSA_IS_ERR_OR_NULL(internal)) {
                 return -EINVAL;
@@ -42,23 +42,23 @@ static int internal_add (struct medusa_signal_backend *backend, struct medusa_si
         if (signal->number <= 0) {
                 return -EINVAL;
         }
-        TAILQ_FOREACH(entry, &internal->entries, list) {
-                if (entry->signal->number == signal->number) {
+        TAILQ_FOREACH(item, &internal->items, list) {
+                if (item->signal->number == signal->number) {
                         return -EEXIST;
                 }
         }
-        entry = malloc(sizeof(struct entry));
-        if (entry == NULL) {
+        item = malloc(sizeof(struct item));
+        if (item == NULL) {
                 return -ENOMEM;
         }
-        entry->signal = signal;
-        TAILQ_INSERT_TAIL(&internal->entries, entry, list);
+        item->signal = signal;
+        TAILQ_INSERT_TAIL(&internal->items, item, list);
         return 0;
 }
 
 static int internal_del (struct medusa_signal_backend *backend, struct medusa_signal *signal)
 {
-        struct entry *entry;
+        struct item *item;
         struct internal *internal = (struct internal *) backend;
         if (MEDUSA_IS_ERR_OR_NULL(internal)) {
                 return -EINVAL;
@@ -69,16 +69,16 @@ static int internal_del (struct medusa_signal_backend *backend, struct medusa_si
         if (signal->number <= 0) {
                 return -EINVAL;
         }
-        TAILQ_FOREACH(entry, &internal->entries, list) {
-                if (entry->signal->number == signal->number) {
+        TAILQ_FOREACH(item, &internal->items, list) {
+                if (item->signal->number == signal->number) {
                         break;
                 }
         }
-        if (entry == NULL) {
+        if (item == NULL) {
                 return -ENOENT;
         }
-        TAILQ_REMOVE(&internal->entries, entry, list);
-        free(entry);
+        TAILQ_REMOVE(&internal->items, item, list);
+        free(item);
         return 0;
 }
 
@@ -93,15 +93,15 @@ static int internal_run (struct medusa_signal_backend *backend)
 
 static void internal_destroy (struct medusa_signal_backend *backend)
 {
-        struct entry *entry;
-        struct entry *nentry;
+        struct item *item;
+        struct item *nitem;
         struct internal *internal = (struct internal *) backend;
         if (internal == NULL) {
                 return;
         }
-        TAILQ_FOREACH_SAFE(entry, &internal->entries, list, nentry) {
-                TAILQ_REMOVE(&internal->entries, entry, list);
-                free(entry);
+        TAILQ_FOREACH_SAFE(item, &internal->items, list, nitem) {
+                TAILQ_REMOVE(&internal->items, item, list);
+                free(item);
         }
         free(internal);
 }
@@ -115,7 +115,7 @@ struct medusa_signal_backend * medusa_signal_null_create (const struct medusa_si
                 return MEDUSA_ERR_PTR(-ENOMEM);
         }
         memset(internal, 0, sizeof(struct internal));
-        TAILQ_INIT(&internal->entries);
+        TAILQ_INIT(&internal->items);
         internal->backend.name    = "null";
         internal->backend.fd      = NULL;
         internal->backend.add     = internal_add;
