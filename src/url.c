@@ -136,6 +136,9 @@ struct medusa_url * medusa_url_parse (const char *uri)
 
         if (e != NULL) {
                 e++;
+                while (*(e + 0) == '/') {
+                        e++;
+                }
                 url->path = e;
         }
 
