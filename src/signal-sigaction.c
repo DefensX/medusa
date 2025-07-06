@@ -20,9 +20,9 @@
 
 #include "signal-sigaction.h"
 
-TAILQ_HEAD(entries, entry);
-struct entry {
-        TAILQ_ENTRY(entry) list;
+TAILQ_HEAD(items, item);
+struct item {
+        TAILQ_ENTRY(item) list;
         struct medusa_signal *signal;
         struct sigaction sa;
 };
@@ -30,7 +30,7 @@ struct entry {
 struct internal {
         struct medusa_signal_backend backend;
         int sfd[2];
-        struct entries entries;
+        struct items items;
 };
 
 static int g_signal_handler_wakeup_write_fd = -1;
@@ -59,7 +59,7 @@ static int internal_fd (struct medusa_signal_backend *backend)
 static int internal_add (struct medusa_signal_backend *backend, struct medusa_signal *signal)
 {
         int rc;
-        struct entry *entry;
+        struct item *item;
         struct sigaction sa;
         struct internal *internal = (struct internal *) backend;
         if (MEDUSA_IS_ERR_OR_NULL(internal)) {
@@ -71,8 +71,8 @@ static int internal_add (struct medusa_signal_backend *backend, struct medusa_si
         if (signal->number <= 0) {
                 return -EINVAL;
         }
-        TAILQ_FOREACH(entry, &internal->entries, list) {
-                if (entry->signal->number == signal->number) {
+        TAILQ_FOREACH(item, &internal->items, list) {
+                if (item->signal->number == signal->number) {
                         return -EEXIST;
                 }
         }
@@ -84,26 +84,26 @@ static int internal_add (struct medusa_signal_backend *backend, struct medusa_si
                 return -EBUSY;
         }
         pthread_mutex_unlock(&g_signal_handler_wakeup_mutex);
-        entry = malloc(sizeof(struct entry));
-        if (entry == NULL) {
+        item = malloc(sizeof(struct item));
+        if (item == NULL) {
                 return -ENOMEM;
         }
-        entry->signal = signal;
+        item->signal = signal;
         memset(&sa, 0, sizeof(struct sigaction));
         sa.sa_handler = internal_signal_handler;
-        rc = sigaction(signal->number, &sa, &entry->sa);
+        rc = sigaction(signal->number, &sa, &item->sa);
         if (rc < 0) {
-                free(entry);
+                free(item);
                 return -errno;
         }
-        TAILQ_INSERT_TAIL(&internal->entries, entry, list);
+        TAILQ_INSERT_TAIL(&internal->items, item, list);
         return 0;
 }
 
 static int internal_del (struct medusa_signal_backend *backend, struct medusa_signal *signal)
 {
         int rc;
-        struct entry *entry;
+        struct item *item;
         struct internal *internal = (struct internal *) backend;
         if (MEDUSA_IS_ERR_OR_NULL(internal)) {
                 return -EINVAL;
@@ -114,20 +114,20 @@ static int internal_del (struct medusa_signal_backend *backend, struct medusa_si
         if (signal->number <= 0) {
                 return -EINVAL;
         }
-        TAILQ_FOREACH(entry, &internal->entries, list) {
-                if (entry->signal->number == signal->number) {
+        TAILQ_FOREACH(item, &internal->items, list) {
+                if (item->signal->number == signal->number) {
                         break;
                 }
         }
-        if (entry == NULL) {
+        if (item == NULL) {
                 return -ENOENT;
         }
-        rc = sigaction(signal->number, &entry->sa, NULL);
+        rc = sigaction(signal->number, &item->sa, NULL);
         if (rc < 0) {
                 return -errno;
         }
-        TAILQ_REMOVE(&internal->entries, entry, list);
-        free(entry);
+        TAILQ_REMOVE(&internal->items, item, list);
+        free(item);
         return 0;
 }
 
@@ -135,8 +135,8 @@ static int internal_run (struct medusa_signal_backend *backend)
 {
         int rc;
         int number;
-        struct entry *entry;
-        struct entry *nentry;
+        struct item *item;
+        struct item *nitem;
         struct internal *internal = (struct internal *) backend;
         if (MEDUSA_IS_ERR_OR_NULL(internal)) {
                 return -EINVAL;
@@ -152,9 +152,9 @@ static int internal_run (struct medusa_signal_backend *backend)
         if (rc != sizeof(int)) {
                 return -EIO;
         }
-        TAILQ_FOREACH_SAFE(entry, &internal->entries, list, nentry) {
-                if (entry->signal->number == (int) number) {
-                        rc = medusa_signal_onevent(entry->signal, MEDUSA_SIGNAL_EVENT_FIRED, NULL);
+        TAILQ_FOREACH_SAFE(item, &internal->items, list, nitem) {
+                if (item->signal->number == (int) number) {
+                        rc = medusa_signal_onevent(item->signal, MEDUSA_SIGNAL_EVENT_FIRED, NULL);
                         if (rc < 0) {
                                 return rc;
                         }
@@ -165,8 +165,8 @@ static int internal_run (struct medusa_signal_backend *backend)
 
 static void internal_destroy (struct medusa_signal_backend *backend)
 {
-        struct entry *entry;
-        struct entry *nentry;
+        struct item *item;
+        struct item *nitem;
         struct internal *internal = (struct internal *) backend;
         if (internal == NULL) {
                 return;
@@ -183,10 +183,10 @@ static void internal_destroy (struct medusa_signal_backend *backend)
         if (internal->sfd[1] >= 0) {
                 close(internal->sfd[1]);
         }
-        TAILQ_FOREACH_SAFE(entry, &internal->entries, list, nentry) {
-                sigaction(entry->signal->number, &entry->sa, NULL);
-                TAILQ_REMOVE(&internal->entries, entry, list);
-                free(entry);
+        TAILQ_FOREACH_SAFE(item, &internal->items, list, nitem) {
+                sigaction(item->signal->number, &item->sa, NULL);
+                TAILQ_REMOVE(&internal->items, item, list);
+                free(item);
         }
         free(internal);
 }
@@ -207,7 +207,7 @@ struct medusa_signal_backend * medusa_signal_sigaction_create (const struct medu
                 return MEDUSA_ERR_PTR(-ENOMEM);
         }
         memset(internal, 0, sizeof(struct internal));
-        TAILQ_INIT(&internal->entries);
+        TAILQ_INIT(&internal->items);
         rc = medusa_pipe(internal->sfd);
         if (rc < 0) {
                 pthread_mutex_unlock(&g_signal_handler_wakeup_mutex);

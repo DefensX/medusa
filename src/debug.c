@@ -14,6 +14,8 @@ static pthread_mutex_t medusa_debug_mutex       = PTHREAD_MUTEX_INITIALIZER;
 
 static char *debug_buffer       = NULL;
 static int debug_buffer_size    = 0;
+static int (*debug_callback_function) (void *context, const char *format, ...)  = NULL;
+static void *debug_callback_context                                             = NULL;
 
 void medusa_debug_lock (void)
 {
@@ -116,14 +118,27 @@ int medusa_debug_printf (int level, const char *name, const char *function, cons
         tm = localtime(&seconds);
         strftime(date, sizeof(date), "%x-%H:%M:%S", tm);
 
-        fprintf(stderr, "medusa:%s.%03d:%-8s:%-6s: %s (%s %s:%d)\n", date, milliseconds, name, medusa_debug_level_to_string(level), debug_buffer, function, file, line);
-        fflush(stderr);
+        if (debug_callback_function != NULL) {
+                debug_callback_function(debug_callback_context, "medusa:%s.%03d:%-8s:%-6s: %s (%s %s:%d)\n", date, milliseconds, name, medusa_debug_level_to_string(level), debug_buffer, function, file, line);
+        } else {
+                fprintf(stderr, "medusa:%s.%03d:%-8s:%-6s: %s (%s %s:%d)\n", date, milliseconds, name, medusa_debug_level_to_string(level), debug_buffer, function, file, line);
+                fflush(stderr);
+        }
 
         medusa_debug_unlock();
 
         return 0;
 bail:   va_end(ap);
         return -1;
+}
+
+int medusa_debug_set_callback (int (*function) (void *context, const char *format, ...), void *context)
+{
+        medusa_debug_lock();
+        debug_callback_function = function;
+        debug_callback_context  = context;
+        medusa_debug_unlock();
+        return 0;
 }
 
 __attribute__((destructor)) int medusa_debug_fini (void)

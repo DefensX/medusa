@@ -76,6 +76,7 @@ extern int medusa_debug_level;
 const char * medusa_debug_level_to_string (int level);
 int medusa_debug_level_from_string (const char *string);
 int medusa_debug_printf (int level, const char *name, const char *function, const char *file, int line, const char *fmt, ...) __attribute__((format(printf, 6, 7)));
+int medusa_debug_set_callback (int (*function) (void *context, const char *format, ...), void *context);
 
 void medusa_debug_lock (void);
 void medusa_debug_unlock (void);

@@ -1283,6 +1283,7 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                 goto bail;
         }
         if (monitor->timer.backend == NULL) {
+                medusa_errorf("can not create timer backend");
                 goto bail;
         }
         monitor->timer.backend->monitor = monitor;
@@ -1315,6 +1316,7 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                 monitor->signal.backend = medusa_signal_null_create(NULL);
 #endif
         } else {
+                medusa_errorf("invalid signal type: %d", options->signal.type);
                 goto bail;
         }
         if (MEDUSA_IS_ERR_OR_NULL(monitor->signal.backend)) {
