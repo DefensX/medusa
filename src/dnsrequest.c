@@ -714,7 +714,7 @@ static struct medusa_dnsrequest_reply_answer * medusa_dnsrequest_reply_answer_cr
         answer->u.generic.class = danswer->generic.class;
         answer->u.generic.ttl   = danswer->generic.ttl;
 
-        rc = -1;
+        rc = 0;
         switch (answer->u.generic.type) {
                 case MEDUSA_DNSREQUEST_RECORD_TYPE_A:           rc = medusa_dnsrequest_record_a_init(&answer->u.a, &danswer->a);             break;
                 case MEDUSA_DNSREQUEST_RECORD_TYPE_NS:          rc = medusa_dnsrequest_record_ns_init(&answer->u.ns, &danswer->ns);          break;
@@ -803,9 +803,6 @@ static int medusa_dnsrequest_reply_answers_init (struct medusa_dnsrequest_reply_
                 goto bail;
         }
 
-        memset(answers, 0, sizeof(struct medusa_dnsrequest_reply_answers));
-        TAILQ_INIT(answers);
-
         for (i = 0; i < dnanswers; i++) {
                 answer = medusa_dnsrequest_reply_answer_create(&danswers[i]);
                 if (answer == NULL) {
@@ -843,9 +840,6 @@ static int medusa_dnsrequest_reply_questions_init (struct medusa_dnsrequest_repl
         if (questions == NULL) {
                 goto bail;
         }
-
-        memset(questions, 0, sizeof(struct medusa_dnsrequest_reply_questions));
-        TAILQ_INIT(questions);
 
         for (i = 0; i < dnquestions; i++) {
                 question = medusa_dnsrequest_reply_question_create(&dquestions[i]);
@@ -926,17 +920,27 @@ static struct medusa_dnsrequest_reply * medusa_dnsrequest_reply_create (dns_quer
                 goto bail;
         }
         memset(reply, 0, sizeof(struct medusa_dnsrequest_reply));
+        TAILQ_INIT(&reply->questions);
+        TAILQ_INIT(&reply->answers);
 
         rc = medusa_dnsrequest_reply_header_init(&reply->header, query);
         if (rc != 0) {
+                medusa_errorf("dns response header is invalid");
                 goto bail;
         }
         rc = medusa_dnsrequest_reply_questions_init(&reply->questions, query->questions, query->qdcount);
         if (rc != 0) {
+                medusa_errorf("dns response questions is invalid");
                 goto bail;
         }
         rc = medusa_dnsrequest_reply_answers_init(&reply->answers, query->answers, query->ancount);
         if (rc != 0) {
+                medusa_errorf("dns response answers is invalid");
+                goto bail;
+        }
+        rc = medusa_dnsrequest_reply_answers_init(&reply->answers, query->additional, query->arcount);
+        if (rc != 0) {
+                medusa_errorf("dns response additional is invalid");
                 goto bail;
         }
 
@@ -1206,6 +1210,7 @@ static int dnsrequest_udpsocket_onevent (struct medusa_udpsocket *udpsocket, uns
                                 goto bail;
                         }
                 }
+                replysize = rc;
 
                 bufsize = sizeof(bufresult);
                 rc = dns_decode(bufresult, &bufsize, reply, replysize);
@@ -1225,7 +1230,7 @@ static int dnsrequest_udpsocket_onevent (struct medusa_udpsocket *udpsocket, uns
                         }
                 }
 
-                //dns_print_result((dns_query_t *)bufresult);
+                //dns_print_result((dns_query_t *) bufresult);
 
                 dnsrequest->reply = medusa_dnsrequest_reply_create((dns_query_t *) bufresult);
                 if (dnsrequest->reply == NULL) {
