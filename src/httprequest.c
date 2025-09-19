@@ -839,6 +839,12 @@ static int httprequest_init_with_options_unlocked (struct medusa_httprequest *ht
                         return rc;
                 }
         }
+        if (options->host != NULL) {
+                rc = medusa_httprequest_set_host_unlocked(httprequest, "%s", options->host);
+                if (rc < 0) {
+                        return rc;
+                }
+        }
         rc = medusa_monitor_add_unlocked(options->monitor, &httprequest->subject);
         if (rc < 0) {
                 return rc;
@@ -869,6 +875,7 @@ __attribute__ ((visibility ("default"))) int medusa_httprequest_init_options_def
         options->read_timeout    = -1;
         options->method          = "GET";
         options->url             = NULL;
+        options->host            = NULL;
         return 0;
 }
 
@@ -1264,6 +1271,118 @@ __attribute__ ((visibility ("default"))) const char * medusa_httprequest_get_url
         return rc;
 }
 
+__attribute__ ((visibility ("default"))) int medusa_httprequest_set_host_unlocked (struct medusa_httprequest *httprequest, const char *host, ...)
+{
+        int64_t rc;
+        va_list va;
+        if (MEDUSA_IS_ERR_OR_NULL(httprequest)) {
+                return -EINVAL;
+        }
+        if (MEDUSA_IS_ERR_OR_NULL(host)) {
+                return -EINVAL;
+        }
+        va_start(va, host);
+        rc = medusa_httprequest_set_vhost_unlocked(httprequest, host, va);
+        va_end(va);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_httprequest_set_host (struct medusa_httprequest *httprequest, const char *host, ...)
+{
+        int64_t rc;
+        va_list va;
+        if (MEDUSA_IS_ERR_OR_NULL(httprequest)) {
+                return -EINVAL;
+        }
+        if (MEDUSA_IS_ERR_OR_NULL(host)) {
+                return -EINVAL;
+        }
+        va_start(va, host);
+        rc = medusa_httprequest_set_vhost(httprequest, host, va);
+        va_end(va);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_httprequest_set_vhost_unlocked (struct medusa_httprequest *httprequest, const char *fmt, va_list va)
+{
+        int rs;
+
+        int len;
+        va_list vp;
+
+        if (MEDUSA_IS_ERR_OR_NULL(httprequest)) {
+                return -EINVAL;
+        }
+        if (MEDUSA_IS_ERR_OR_NULL(fmt)) {
+                return -EINVAL;
+        }
+
+        rs = -EIO;
+
+        if (httprequest->host != NULL) {
+                free(httprequest->host);
+                httprequest->host = NULL;
+        }
+
+        va_copy(vp, va);
+        len = vsnprintf(NULL, 0, fmt, vp);
+        va_end(vp);
+        if (len < 0) {
+                goto bail;
+        }
+        httprequest->host = malloc(len + 1);
+        if (httprequest->host == NULL) {
+                rs = -ENOMEM;
+                goto bail;
+        }
+        va_copy(vp, va);
+        len = vsnprintf(httprequest->host, len + 1, fmt, vp);
+        va_end(vp);
+        if (len < 0) {
+                rs = -EIO;
+                goto bail;
+        }
+
+        return 0;
+bail:   if (httprequest->host != NULL) {
+                free(httprequest->host);
+                httprequest->host = NULL;
+        }
+        return rs;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_httprequest_set_vhost (struct medusa_httprequest *httprequest, const char *host, va_list va)
+{
+        int64_t rc;
+        if (MEDUSA_IS_ERR_OR_NULL(httprequest)) {
+                return -EINVAL;
+        }
+        medusa_monitor_lock(httprequest->subject.monitor);
+        rc = medusa_httprequest_set_vhost_unlocked(httprequest, host, va);
+        medusa_monitor_unlock(httprequest->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_httprequest_get_host_unlocked (const struct medusa_httprequest *httprequest)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(httprequest)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
+        return httprequest->host;
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_httprequest_get_host (const struct medusa_httprequest *httprequest)
+{
+        const char *rc;
+        if (MEDUSA_IS_ERR_OR_NULL(httprequest)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
+        medusa_monitor_lock(httprequest->subject.monitor);
+        rc = medusa_httprequest_get_host_unlocked(httprequest);
+        medusa_monitor_unlock(httprequest->subject.monitor);
+        return rc;
+}
+
 __attribute__ ((visibility ("default"))) int medusa_httprequest_add_header_unlocked (struct medusa_httprequest *httprequest, const char *key, const char *value)
 {
         int rc;
@@ -1537,6 +1656,8 @@ __attribute__ ((visibility ("default"))) int medusa_httprequest_make_request_unl
         medusa_tcpsocket_connect_options.nonblocking     = 1;
         medusa_tcpsocket_connect_options.nodelay         = 1;
         medusa_tcpsocket_connect_options.buffered        = 1;
+        medusa_tcpsocket_connect_options.ssl             = url.ssl;
+        medusa_tcpsocket_connect_options.ssl_hostname    = httprequest->host;
         medusa_tcpsocket_connect_options.enabled         = 1;
         httprequest->tcpsocket = medusa_tcpsocket_connect_with_options_unlocked(&medusa_tcpsocket_connect_options);
         if (MEDUSA_IS_ERR_OR_NULL(httprequest->tcpsocket)) {
@@ -1554,7 +1675,7 @@ __attribute__ ((visibility ("default"))) int medusa_httprequest_make_request_unl
                 ret = rc;
                 goto bail;
         }
-        rc = medusa_tcpsocket_printf_unlocked(httprequest->tcpsocket, "Host: %s\r\n", url.host);
+        rc = medusa_tcpsocket_printf_unlocked(httprequest->tcpsocket, "Host: %s\r\n", httprequest->host ? httprequest->host : url.host);
         if (rc < 0) {
                 ret = rc;
                 goto bail;
@@ -1785,6 +1906,10 @@ __attribute__ ((visibility ("default"))) int medusa_httprequest_onevent_unlocked
                 if (httprequest->url != NULL) {
                         free(httprequest->url);
                         httprequest->url = NULL;
+                }
+                if (httprequest->host != NULL) {
+                        free(httprequest->host);
+                        httprequest->host = NULL;
                 }
                 if (!MEDUSA_IS_ERR_OR_NULL(httprequest->headers)) {
                         medusa_buffer_destroy(httprequest->headers);

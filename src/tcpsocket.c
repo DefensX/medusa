@@ -2743,15 +2743,6 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 goto bail;
         }
 
-#if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
-        tcpsocket->ssl_hostname = strdup(address);
-        if (tcpsocket->ssl_hostname == NULL) {
-                ret = -ENOMEM;
-                line = __LINE__;
-                goto bail;
-        }
-#endif
-
         tcpsocket_add_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_CONNECT);
         if (options->fd >= 0) {
                 tcpsocket_add_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_ATTACH);
@@ -2814,6 +2805,12 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 goto bail;
         }
         rc = medusa_tcpsocket_set_ssl_verify_unlocked(tcpsocket, options->ssl_verify);
+        if (rc < 0) {
+                ret = rc;
+                line = __LINE__;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_ssl_hostname_unlocked(tcpsocket, options->ssl_hostname ? options->ssl_hostname : address);
         if (rc < 0) {
                 ret = rc;
                 line = __LINE__;
@@ -2949,6 +2946,11 @@ ipv6:
 
                 rc = getaddrinfo(address, NULL, &hints, &result);
                 if (rc != 0) {
+                        ret = -EIO;
+                        line = __LINE__;
+                        goto bail;
+                }
+                if (options->ssl_hostname != NULL) {
                         ret = -EIO;
                         line = __LINE__;
                         goto bail;
@@ -4563,6 +4565,64 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_ssl_verify (co
         }
         medusa_monitor_lock(tcpsocket->subject.monitor);
         rc = medusa_tcpsocket_get_ssl_verify_unlocked(tcpsocket);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_hostname_unlocked (struct medusa_tcpsocket *tcpsocket, const char *hostname)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+#if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
+        if (tcpsocket->ssl_hostname != NULL) {
+                free(tcpsocket->ssl_hostname);
+                tcpsocket->ssl_hostname = NULL;
+        }
+        if (hostname != NULL) {
+                tcpsocket->ssl_hostname = strdup(hostname);
+                if (tcpsocket->ssl_hostname == NULL) {
+                        return -ENOMEM;
+                }
+        }
+#else
+        (void) hostname;
+#endif
+        return 0;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_hostname (struct medusa_tcpsocket *tcpsocket, const char *hostname)
+{
+        int rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_set_ssl_hostname_unlocked(tcpsocket, hostname);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_tcpsocket_get_ssl_hostname_unlocked (const struct medusa_tcpsocket *tcpsocket)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
+#if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
+        return tcpsocket->ssl_hostname;
+#else
+        return NULL;
+#endif
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_tcpsocket_get_ssl_hostname (const struct medusa_tcpsocket *tcpsocket)
+{
+        const char *rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_get_ssl_hostname_unlocked(tcpsocket);
         medusa_monitor_unlock(tcpsocket->subject.monitor);
         return rc;
 }

@@ -82,6 +82,7 @@ struct medusa_httprequest_init_options {
         double read_timeout;
         const char *method;
         const char *url;
+        const char *host;
         int (*onevent) (struct medusa_httprequest *httprequest, unsigned int events, void *context, void *param);
         void *context;
 };
@@ -137,6 +138,10 @@ int medusa_httprequest_set_method (struct medusa_httprequest *httprequest, const
 int medusa_httprequest_set_url (struct medusa_httprequest *httprequest, const char *url, ...) __attribute__((format(printf, 2, 3)));
 int medusa_httprequest_set_vurl (struct medusa_httprequest *httprequest, const char *url, va_list va);
 const char * medusa_httprequest_get_url (const struct medusa_httprequest *httprequest);
+
+int medusa_httprequest_set_host (struct medusa_httprequest *httprequest, const char *host, ...) __attribute__((format(printf, 2, 3)));
+int medusa_httprequest_set_vhost (struct medusa_httprequest *httprequest, const char *host, va_list va);
+const char * medusa_httprequest_get_host (const struct medusa_httprequest *httprequest);
 
 int medusa_httprequest_add_header (struct medusa_httprequest *httprequest, const char *key, const char *value);
 int medusa_httprequest_add_headerf (struct medusa_httprequest *httprequest, const char *key, const char *value, ...) __attribute__((format(printf, 3, 4)));

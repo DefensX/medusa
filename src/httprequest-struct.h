@@ -9,6 +9,7 @@ struct medusa_httprequest {
         void *context;
         char *method;
         char *url;
+        char *host;
         struct medusa_buffer *headers;
         struct medusa_tcpsocket *tcpsocket;
         struct medusa_dnsresolver *dnsresolver;

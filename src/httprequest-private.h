@@ -25,6 +25,10 @@ int medusa_httprequest_set_url_unlocked (struct medusa_httprequest *httprequest,
 int medusa_httprequest_set_vurl_unlocked (struct medusa_httprequest *httprequest, const char *url, va_list va);
 const char * medusa_httprequest_get_url_unlocked (const struct medusa_httprequest *httprequest);
 
+int medusa_httprequest_set_host_unlocked (struct medusa_httprequest *httprequest, const char *host, ...) __attribute__((format(printf, 2, 3)));
+int medusa_httprequest_set_vhost_unlocked (struct medusa_httprequest *httprequest, const char *host, va_list va);
+const char * medusa_httprequest_get_host_unlocked (const struct medusa_httprequest *httprequest);
+
 int medusa_httprequest_add_header_unlocked (struct medusa_httprequest *httprequest, const char *key, const char *value);
 int medusa_httprequest_add_headerf_unlocked (struct medusa_httprequest *httprequest, const char *key, const char *value, ...) __attribute__((format(printf, 3, 4)));
 int medusa_httprequest_add_headerv_unlocked (struct medusa_httprequest *httprequest, const char *key, const char *value, va_list va);
