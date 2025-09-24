@@ -749,7 +749,7 @@ __attribute__ ((visibility ("default"))) int medusa_httpserver_set_ssl_certifica
         return medusa_tcpsocket_set_ssl_certificate_file_unlocked(httpserver->tcpsocket, certificate);
 }
 
-__attribute__ ((visibility ("default"))) int medusa_httpserver_set_ssl_file_certificate (struct medusa_httpserver *httpserver, const char *certificate)
+__attribute__ ((visibility ("default"))) int medusa_httpserver_set_ssl_certificate_file (struct medusa_httpserver *httpserver, const char *certificate)
 {
         int rc;
         if (MEDUSA_IS_ERR_OR_NULL(httpserver)) {
