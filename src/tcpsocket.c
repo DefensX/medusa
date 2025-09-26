@@ -4638,18 +4638,31 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_certificat
                 tcpsocket->ssl_certificate = NULL;
         }
         if (certificate != NULL) {
+                int rc;
+                char *ssl_certificate;
                 if (length < 0) {
-                        tcpsocket->ssl_certificate = strdup(certificate);
-                        if (tcpsocket->ssl_certificate == NULL) {
+                        ssl_certificate = strdup(certificate);
+                        if (ssl_certificate == NULL) {
                                 return -ENOMEM;
                         }
                 } else {
-                        tcpsocket->ssl_certificate = malloc(length + 1);
-                        if (tcpsocket->ssl_certificate == NULL) {
+                        ssl_certificate = malloc(length + 1);
+                        if (ssl_certificate == NULL) {
                                 return -ENOMEM;
                         }
-                        memcpy(tcpsocket->ssl_certificate, certificate, length);
-                        tcpsocket->ssl_certificate[length] = '\0';
+                        memcpy(ssl_certificate, certificate, length);
+                        ssl_certificate[length] = '\0';
+                }
+                rc = access(ssl_certificate, R_OK);
+                if (rc == 0) {
+                        rc = medusa_tcpsocket_set_ssl_certificate_file_unlocked(tcpsocket, ssl_certificate);
+                        if (rc != 0) {
+                                free(ssl_certificate);
+                                return rc;
+                        }
+                        free(ssl_certificate);
+                } else {
+                        tcpsocket->ssl_certificate = ssl_certificate;
                 }
         }
 #else
@@ -4774,18 +4787,31 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_privatekey
                 tcpsocket->ssl_privatekey = NULL;
         }
         if (privatekey != NULL) {
+                int rc;
+                char *ssl_privatekey;
                 if (length < 0) {
-                        tcpsocket->ssl_privatekey = strdup(privatekey);
-                        if (tcpsocket->ssl_privatekey == NULL) {
+                        ssl_privatekey = strdup(privatekey);
+                        if (ssl_privatekey == NULL) {
                                 return -ENOMEM;
                         }
                 } else {
-                        tcpsocket->ssl_privatekey = malloc(length + 1);
-                        if (tcpsocket->ssl_privatekey == NULL) {
+                        ssl_privatekey = malloc(length + 1);
+                        if (ssl_privatekey == NULL) {
                                 return -ENOMEM;
                         }
-                        memcpy(tcpsocket->ssl_privatekey, privatekey, length);
-                        tcpsocket->ssl_privatekey[length] = '\0';
+                        memcpy(ssl_privatekey, privatekey, length);
+                        ssl_privatekey[length] = '\0';
+                }
+                rc = access(ssl_privatekey, R_OK);
+                if (rc == 0) {
+                        rc = medusa_tcpsocket_set_ssl_privatekey_file_unlocked(tcpsocket, ssl_privatekey);
+                        if (rc != 0) {
+                                free(ssl_privatekey);
+                                return rc;
+                        }
+                        free(ssl_privatekey);
+                } else {
+                        tcpsocket->ssl_privatekey = ssl_privatekey;
                 }
         }
 #else
