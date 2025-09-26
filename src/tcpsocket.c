@@ -4389,23 +4389,23 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_unlocked (
                                 }
                                 if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->ssl_privatekey)) {
                                         BIO *bio;
-                                        RSA *rsa;
+                                        EVP_PKEY *pkey;
                                         bio = BIO_new_mem_buf(tcpsocket->ssl_privatekey, -1);
                                         if (bio == NULL) {
                                                 return -EIO;
                                         }
-                                        rsa = PEM_read_bio_RSAPrivateKey(bio, NULL, 0, NULL);
-                                        if (rsa == NULL) {
+                                        pkey = PEM_read_bio_PrivateKey(bio, NULL, 0, NULL);
+                                        if (pkey == NULL) {
                                                 BIO_free(bio);
                                                 return -EIO;
                                         }
-                                        rc = SSL_CTX_use_RSAPrivateKey(tcpsocket->ssl_ctx, rsa);
+                                        rc = SSL_CTX_use_PrivateKey(tcpsocket->ssl_ctx, pkey);
                                         if (rc <= 0) {
-                                                RSA_free(rsa);
+                                                EVP_PKEY_free(pkey);
                                                 BIO_free(bio);
                                                 return -EIO;
                                         }
-                                        RSA_free(rsa);
+                                        EVP_PKEY_free(pkey);
                                         BIO_free(bio);
                                 }
                                 if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->ssl_ca_certificate)) {
