@@ -447,6 +447,13 @@ static inline int tcpsocket_set_state (struct medusa_tcpsocket *tcpsocket, unsig
                                         tcpsocket->ssl_wantread = 1;
                                 } else if (error == SSL_ERROR_WANT_WRITE) {
                                         tcpsocket->ssl_wantwrite = 1;
+                                        if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->io)) {
+                                                rc = medusa_io_add_events_unlocked(tcpsocket->io, MEDUSA_IO_EVENT_OUT);
+                                                if (rc < 0) {
+                                                        medusa_errorf("medusa_io_add_events_unlocked failed, rc: %d", rc);
+                                                        return -EIO;
+                                                }
+                                        }
                                 } else if (error == SSL_ERROR_SYSCALL) {
                                         tcpsocket->ssl_wantread = 1;
                                 } else {
@@ -3380,6 +3387,13 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_enabled_unlock
                                 tcpsocket->ssl_wantread = 1;
                         } else if (error == SSL_ERROR_WANT_WRITE) {
                                 tcpsocket->ssl_wantwrite = 1;
+                                if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->io)) {
+                                        rc = medusa_io_add_events_unlocked(tcpsocket->io, MEDUSA_IO_EVENT_OUT);
+                                        if (rc < 0) {
+                                                medusa_errorf("medusa_io_add_events_unlocked failed, rc: %d", rc);
+                                                return -EIO;
+                                        }
+                                }
                         } else if (error == SSL_ERROR_SYSCALL) {
                                 tcpsocket->ssl_wantread = 1;
                         } else {
@@ -4464,6 +4478,13 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_unlocked (
                                         tcpsocket->ssl_wantread = 1;
                                 } else if (error == SSL_ERROR_WANT_WRITE) {
                                         tcpsocket->ssl_wantwrite = 1;
+                                        if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->io)) {
+                                                rc = medusa_io_add_events_unlocked(tcpsocket->io, MEDUSA_IO_EVENT_OUT);
+                                                if (rc < 0) {
+                                                        medusa_errorf("medusa_io_add_events_unlocked failed, rc: %d", rc);
+                                                        return -EIO;
+                                                }
+                                        }
                                 } else if (error == SSL_ERROR_SYSCALL) {
                                         tcpsocket->ssl_wantread = 1;
                                 } else {
