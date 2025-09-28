@@ -4399,6 +4399,18 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_unlocked (
                                                 return -EIO;
                                         }
                                         X509_free(x509);
+                                        for (;;) {
+                                                X509 *chaincert = PEM_read_bio_X509(bio, NULL, 0, NULL);
+                                                if (chaincert == NULL) {
+                                                        /* No more certs in PEM */
+                                                        break;
+                                                }
+                                                if (SSL_CTX_add_extra_chain_cert(tcpsocket->ssl_ctx, chaincert) != 1) {
+                                                        X509_free(chaincert);
+                                                        BIO_free(bio);
+                                                        return -EIO;
+                                                }
+                                        }
                                         BIO_free(bio);
                                 }
                                 if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->ssl_privatekey)) {
@@ -4421,6 +4433,9 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_unlocked (
                                         }
                                         EVP_PKEY_free(pkey);
                                         BIO_free(bio);
+                                        if (SSL_CTX_check_private_key(tcpsocket->ssl_ctx) != 1) {
+                                                return -EIO;
+                                        }
                                 }
                                 if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->ssl_ca_certificate)) {
                                         BIO *bio;
