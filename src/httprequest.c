@@ -1701,11 +1701,13 @@ __attribute__ ((visibility ("default"))) int medusa_httprequest_make_request_unl
                 }
                 olen += rlen;
         }
+#if 0
         rc = medusa_tcpsocket_printf_unlocked(httprequest->tcpsocket, "Connection: close\r\n");
         if (rc < 0) {
                 ret = rc;
                 goto bail;
         }
+#endif
         if (httprequest->method &&  strcasecmp(httprequest->method, "POST") == 0) {
                 rc = medusa_tcpsocket_printf_unlocked(httprequest->tcpsocket, "Content-Length: %ld\r\n", (long int) length);
                 if (rc < 0) {
