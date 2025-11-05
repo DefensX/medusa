@@ -1646,6 +1646,10 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_run_timeout (struct 
         if (rc < 0) {
                 goto bail;
         }
+        rc = monitor_process_changes(monitor);
+        if (rc < 0) {
+                goto bail;
+        }
 
         rc = monitor_setup_timer(monitor, &remaining);
         if (rc < 0) {
