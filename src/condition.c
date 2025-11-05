@@ -196,15 +196,7 @@ __attribute__ ((visibility ("default"))) void medusa_condition_destroy (struct m
 
 __attribute__ ((visibility ("default"))) int medusa_condition_signal_unlocked (struct medusa_condition *condition)
 {
-        int rc;
-        if (MEDUSA_IS_ERR_OR_NULL(condition)) {
-                return -EINVAL;
-        }
-        rc = condition_set_signalled(condition, 1);
-        if (rc < 0) {
-                return rc;
-        }
-        return medusa_monitor_mod_unlocked(&condition->subject);
+        return medusa_condition_set_signalled_unlocked(condition, 1);
 }
 
 __attribute__ ((visibility ("default"))) int medusa_condition_set_signalled_unlocked (struct medusa_condition *condition, int signalled)
@@ -213,7 +205,10 @@ __attribute__ ((visibility ("default"))) int medusa_condition_set_signalled_unlo
         if (MEDUSA_IS_ERR_OR_NULL(condition)) {
                 return -EINVAL;
         }
-        rc = condition_set_signalled(condition, signalled);
+        if (medusa_condition_get_signalled_unlocked(condition) == !!signalled) {
+                return 0;
+        }
+        rc = condition_set_signalled(condition, !!signalled);
         if (rc < 0) {
                 return rc;
         }
