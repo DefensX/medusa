@@ -858,7 +858,7 @@ static int monitor_check_timer (struct medusa_monitor *monitor)
                         }
                         timer->subject.flags &= ~MEDUSA_SUBJECT_FLAG_HEAP;
                         monitor->timer.dirty = 1;
-                        rc = monitor_subject_onevent(monitor, &timer->subject, MEDUSA_TIMER_EVENT_TIMEOUT);
+                        rc = monitor_subject_onevent(monitor, &timer->subject, MEDUSA_TIMER_EVENT_TIMEOUT, NULL);
                         if (rc != 0) {
                                 goto bail;
                         }
@@ -1632,6 +1632,14 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_run_timeout (struct 
         }
 
         medusa_monitor_lock(monitor);
+
+        /*
+         * monitor: reprocess changes after condition signals to avoid event delay
+         *
+         * Added a second monitor_process_changes() call after condition handling to
+         * immediately apply new or modified subjects triggered by signals. This fixes
+         * a race where newly added IOs would only activate on the next loop iteration.
+         */
 
         rc = monitor_process_deletes(monitor);
         if (rc < 0) {
