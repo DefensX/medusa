@@ -1172,6 +1172,13 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                         medusa_errorf("ioctl failed, n: %d", n);
                                         goto bail;
                                 }
+#if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
+                                if (tcpsocket->ssl != NULL) {
+                                        if (n == 0) {
+                                                n = 4096;
+                                        }
+                                }
+#endif
                                 if (tcpsocket->rbuffer_limit > 0) {
                                         blength = medusa_buffer_get_length(tcpsocket->rbuffer);
                                         if (blength < 0) {
@@ -1242,6 +1249,7 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                         tcpsocket->ssl_wantwrite = 0;
                                                 }
                                                 ERR_clear_error();
+                                                errno = 0;
                                                 rlength = SSL_read(tcpsocket->ssl, iovec.iov_base, iovec.iov_len);
                                                 if (rlength <= 0) {
                                                         int error;
@@ -1269,8 +1277,12 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                                         }
                                                                 }
                                                         } else {
-                                                                rlength = -1;
-                                                                errno = EIO;
+                                                                if (errno == 0) {
+                                                                        rlength = 0;
+                                                                } else {
+                                                                        rlength = -1;
+                                                                        errno = EIO;
+                                                                }
                                                         }
                                                 }
                                                 if (!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK) &&

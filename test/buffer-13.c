@@ -136,7 +136,9 @@ static int test_buffer (unsigned int type)
 
         medusa_buffer_destroy(buffer);
         if (bevents != (MEDUSA_BUFFER_EVENT_WRITE |
+                        MEDUSA_BUFFER_EVENT_CHOKE |
                         MEDUSA_BUFFER_EVENT_DESTROY)) {
+                fprintf(stderr, "fail bevents: %u != %u\n", bevents, (MEDUSA_BUFFER_EVENT_WRITE | MEDUSA_BUFFER_EVENT_DESTROY));
                 goto bail;
         }
         return 0;
