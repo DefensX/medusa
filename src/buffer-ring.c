@@ -501,7 +501,7 @@ static int64_t ring_buffer_commitv (struct medusa_buffer *buffer, const struct m
                 if (ring->length + l > ring->size) {
                         return -EINVAL;
                 }
-                l += iovecs[0].iov_len;
+                l += iovecs[i].iov_len;
         }
 
         ring->length += l;
