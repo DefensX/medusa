@@ -121,6 +121,7 @@ int64_t medusa_buffer_peekv (const struct medusa_buffer *buffer, int64_t offset,
 int64_t medusa_buffer_choke (struct medusa_buffer *buffer, int64_t offset, int64_t length);
 
 void * medusa_buffer_linearize (struct medusa_buffer *buffer, int64_t offset, int64_t length);
+int medusa_buffer_shrink (struct medusa_buffer *buffer, int64_t size);
 
 int medusa_buffer_memcmp (const struct medusa_buffer *buffer, int64_t offset, const void *data, int64_t length);
 int64_t medusa_buffer_memmem (const struct medusa_buffer *buffer, int64_t offset, const void *data, int64_t length);

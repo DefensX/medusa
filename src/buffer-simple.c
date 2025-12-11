@@ -31,7 +31,13 @@ static int simple_buffer_resize (struct medusa_buffer_simple *simple, int64_t ns
         if (nsize < 0) {
                 return -EINVAL;
         }
-        if (simple->size >= nsize) {
+        if (nsize < simple->length) {
+                return -EINVAL;
+        }
+        if (nsize == 0) {
+                free(simple->data);
+                simple->data = NULL;
+                simple->size = 0;
                 return 0;
         }
         size  = nsize / simple->grow;
@@ -309,6 +315,24 @@ static void * simple_buffer_linearize (struct medusa_buffer *buffer, int64_t off
         return simple->data + offset;
 }
 
+static int simple_buffer_shrink (struct medusa_buffer *buffer, int64_t size)
+{
+        struct medusa_buffer_simple *simple = (struct medusa_buffer_simple *) buffer;
+        if (MEDUSA_IS_ERR_OR_NULL(simple)) {
+                return -EINVAL;
+        }
+        if (size < 0) {
+                return -EINVAL;
+        }
+        if (size < simple->length) {
+                return -EINVAL;
+        }
+        if (size >= simple->size) {
+                return 0;
+        }
+        return simple_buffer_resize(simple, size);
+}
+
 static int simple_buffer_reset (struct medusa_buffer *buffer)
 {
         struct medusa_buffer_simple *simple = (struct medusa_buffer_simple *) buffer;
@@ -349,6 +373,7 @@ const struct medusa_buffer_backend simple_buffer_backend = {
         .choke          = simple_buffer_choke,
 
         .linearize      = simple_buffer_linearize,
+        .shrink         = simple_buffer_shrink,
 
         .reset          = simple_buffer_reset,
         .destroy        = simple_buffer_destroy

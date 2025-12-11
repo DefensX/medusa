@@ -59,7 +59,14 @@ static int ring_buffer_resize (struct medusa_buffer_ring *ring, int64_t nsize)
         if (nsize < 0) {
                 return -EINVAL;
         }
-        if (ring->size >= nsize) {
+        if (nsize < ring->length) {
+                return -EINVAL;
+        }
+        if (nsize == 0) {
+                free(ring->data);
+                ring->data = NULL;
+                ring->size = 0;
+                ring->head = 0;
                 return 0;
         }
         size  = nsize / ring->grow;
@@ -762,6 +769,24 @@ again:
         }
 }
 
+static int ring_buffer_shrink (struct medusa_buffer *buffer, int64_t size)
+{
+        struct medusa_buffer_ring *ring = (struct medusa_buffer_ring *) buffer;
+        if (MEDUSA_IS_ERR_OR_NULL(ring)) {
+                return -EINVAL;
+        }
+        if (size < 0) {
+                return -EINVAL;
+        }
+        if (size < ring->length) {
+                return -EINVAL;
+        }
+        if (size >= ring->size) {
+                return 0;
+        }
+        return ring_buffer_resize(ring, size);
+}
+
 static int ring_buffer_reset (struct medusa_buffer *buffer)
 {
         struct medusa_buffer_ring *ring = (struct medusa_buffer_ring *) buffer;
@@ -803,6 +828,7 @@ const struct medusa_buffer_backend ring_buffer_backend = {
         .choke          = ring_buffer_choke,
 
         .linearize      = ring_buffer_linearize,
+        .shrink         = ring_buffer_shrink,
 
         .reset          = ring_buffer_reset,
         .destroy        = ring_buffer_destroy

@@ -594,6 +594,20 @@ __attribute__ ((visibility ("default"))) void * medusa_buffer_linearize (struct 
         return buffer->backend->linearize(buffer, offset, length);
 }
 
+__attribute__ ((visibility ("default"))) int medusa_buffer_shrink (struct medusa_buffer *buffer, int64_t size)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(buffer)) {
+                return -EINVAL;
+        }
+        if (MEDUSA_IS_ERR_OR_NULL(buffer->backend)) {
+                return -EINVAL;
+        }
+        if (MEDUSA_IS_ERR_OR_NULL(buffer->backend->shrink)) {
+                return -EINVAL;
+        }
+        return buffer->backend->shrink(buffer, size);
+}
+
 __attribute__ ((visibility ("default"))) int medusa_buffer_memcmp (const struct medusa_buffer *buffer, int64_t offset, const void *data, int64_t length)
 {
         int ret;
