@@ -1179,21 +1179,22 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                         }
                                 }
 #endif
-                                if (tcpsocket->rbuffer_limit > 0) {
-                                        blength = medusa_buffer_get_length(tcpsocket->rbuffer);
-                                        if (blength < 0) {
-                                                medusa_errorf("can not get read buffer length");
-                                                goto bail;
-                                        }
-                                        if (blength >= tcpsocket->rbuffer_limit) {
-                                                medusa_errorf("read buffer limit reached, this should not happen");
-                                                goto bail;
-                                                n = 0;
-                                        } else {
-                                                n = tcpsocket->rbuffer_limit - blength;
-                                        }
-                                }
                                 while (1) {
+                                        if (medusa_tcpsocket_get_enabled_unlocked(tcpsocket) != 1) {
+                                                break;
+                                        }
+                                        if (tcpsocket->rbuffer_limit > 0) {
+                                                blength = medusa_buffer_get_length(tcpsocket->rbuffer);
+                                                if (blength < 0) {
+                                                        medusa_errorf("can not get read buffer length");
+                                                        goto bail;
+                                                }
+                                                if (blength >= tcpsocket->rbuffer_limit) {
+                                                        break;
+                                                } else {
+                                                        n = tcpsocket->rbuffer_limit - blength;
+                                                }
+                                        }
                                         niovecs = medusa_buffer_reservev(tcpsocket->rbuffer, n, &iovec, 1);
                                         if (niovecs < 0) {
                                                 medusa_errorf("medusa_buffer_reservev failed, niovecs: %d", (int) niovecs);
