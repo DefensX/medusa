@@ -970,15 +970,15 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                                 wlength = 0;
                                                                 errno = 0;
                                                         } else if (error == SSL_ERROR_SYSCALL) {
-                                                                if (errno == 0) {
+                                                                if (errno == 0 || errno == ECONNRESET) {
                                                                         wlength = 0;
                                                                         errno = 0;
-                                                                } else if (errno == ECONNRESET) {
-                                                                        wlength = 0;
-                                                                        errno = 0;
+                                                                } else if (errno == EINTR ||
+                                                                           errno == EAGAIN ||
+                                                                           errno == EWOULDBLOCK) {
+                                                                        wlength = -1;
                                                                 } else {
                                                                         wlength = -1;
-                                                                        errno = EIO;
                                                                 }
                                                         } else if (error == SSL_ERROR_NONE && wlength == 0) {
                                                                 wlength = 0;
@@ -1282,14 +1282,15 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                                 rlength = 0;
                                                                 errno = 0;
                                                         } else if (error == SSL_ERROR_SYSCALL) {
-                                                                if (rlength != 0 && errno != 0) {
-                                                                        if (errno == ECONNRESET) {
-                                                                                rlength = 0;
-                                                                                errno = 0;
-                                                                        } else {
-                                                                                rlength = -1;
-                                                                                errno = EIO;
-                                                                        }
+                                                                if (errno == 0 || errno == ECONNRESET) {
+                                                                        rlength = 0;
+                                                                        errno = 0;
+                                                                } else if (errno == EINTR ||
+                                                                           errno == EAGAIN ||
+                                                                           errno == EWOULDBLOCK) {
+                                                                        rlength = -1;
+                                                                } else {
+                                                                        rlength = -1;
                                                                 }
                                                         } else {
                                                                 if (errno == 0) {
@@ -1703,8 +1704,22 @@ ipv6:
                 int rc;
                 int on;
                 on = !!options->freebind;
+#if defined(IP_FREEBIND) || defined(IPV6_FREEBIND)
+                if (sockaddr->sa_family == AF_INET) {
 #if defined(IP_FREEBIND)
-                rc = setsockopt(fd, IPPROTO_IP, IP_FREEBIND, (void *) &on, sizeof(on));
+                        rc = setsockopt(fd, IPPROTO_IP, IP_FREEBIND, (void *) &on, sizeof(on));
+#else
+                        rc = 0;
+#endif
+                } else if (sockaddr->sa_family == AF_INET6) {
+#if defined(IPV6_FREEBIND)
+                        rc = setsockopt(fd, IPPROTO_IPV6, IPV6_FREEBIND, (void *) &on, sizeof(on));
+#else
+                        rc = 0;
+#endif
+                } else {
+                        rc = 0;
+                }
 #else
                 (void) on;
                 rc = 0;
@@ -3965,18 +3980,34 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_freebind_unloc
                 tcpsocket_del_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_FREEBIND);
         }
         if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->io)) {
+#if defined(IP_FREEBIND) || defined(IPV6_FREEBIND)
                 int rc;
                 int on;
-                on = !!enabled;
-#if defined(IP_FREEBIND)
-                rc = setsockopt(medusa_io_get_fd_unlocked(tcpsocket->io), IPPROTO_IP, IP_FREEBIND, (void *) &on, sizeof(on));
-#else
-                (void) on;
+                int fd;
+                struct sockaddr_storage sockaddr;
+                socklen_t sockaddr_length;
+
                 rc = 0;
+                on = !!enabled;
+                fd = medusa_io_get_fd_unlocked(tcpsocket->io);
+                sockaddr_length = sizeof(sockaddr);
+                if (fd >= 0 && getsockname(fd, (struct sockaddr *) &sockaddr, &sockaddr_length) == 0) {
+                        if (((struct sockaddr *) &sockaddr)->sa_family == AF_INET) {
+#if defined(IP_FREEBIND)
+                                rc = setsockopt(fd, IPPROTO_IP, IP_FREEBIND, (void *) &on, sizeof(on));
 #endif
+                        } else if (((struct sockaddr *) &sockaddr)->sa_family == AF_INET6) {
+#if defined(IPV6_FREEBIND)
+                                rc = setsockopt(fd, IPPROTO_IPV6, IPV6_FREEBIND, (void *) &on, sizeof(on));
+#endif
+                        }
+                }
                 if (rc < 0) {
                         return -errno;
                 }
+#else
+                (void) enabled;
+#endif
         }
         return 0;
 }
