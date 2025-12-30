@@ -3801,7 +3801,7 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_nodelay_unlock
                 tcpsocket_del_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_NODELAY);
         }
         if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->io) &&
-            (tcpsocket->state == MEDUSA_TCPSOCKET_EVENT_LISTENING || tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTED)) {
+            (tcpsocket->state == MEDUSA_TCPSOCKET_STATE_LISTENING || tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTED)) {
                 int rc;
                 int on;
                 on = !!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_NODELAY);
