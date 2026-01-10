@@ -114,9 +114,11 @@ static int64_t simple_buffer_insertv (struct medusa_buffer *buffer, int64_t offs
         for (i = 0; i < niovecs; i++) {
                 length += iovecs[i].iov_len;
         }
-        rc = simple_buffer_resize(simple, simple->length + length);
-        if (rc < 0) {
-                return rc;
+        if (simple->size < simple->length + length) {
+                rc = simple_buffer_resize(simple, simple->length + length);
+                if (rc < 0) {
+                        return rc;
+                }
         }
         if (offset != simple->length) {
                 memmove(simple->data + offset + length, simple->data + offset, simple->length - offset);
@@ -154,15 +156,18 @@ static int64_t simple_buffer_insertfv (struct medusa_buffer *buffer, int64_t off
         if (length < 0) {
                 return -EIO;
         }
-        rc = simple_buffer_resize(simple, simple->length + length + 1);
-        if (rc < 0) {
-                return rc;
+        length += 1;
+        if (simple->size < simple->length + length) {
+                rc = simple_buffer_resize(simple, simple->length + length);
+                if (rc < 0) {
+                        return rc;
+                }
         }
         if (offset != simple->length) {
-                memmove(simple->data + offset + length + 1, simple->data + offset, simple->length - offset);
+                memmove(simple->data + offset + length, simple->data + offset, simple->length - offset);
         }
         va_copy(vs, va);
-        rc = vsnprintf(simple->data + offset, length + 1, format, vs);
+        rc = vsnprintf(simple->data + offset, length, format, vs);
         va_end(vs);
         if (rc < 0) {
                 return -EIO;
@@ -190,9 +195,11 @@ static int64_t simple_buffer_reservev (struct medusa_buffer *buffer, int64_t len
         if (niovecs == 0) {
                 return 1;
         }
-        rc = simple_buffer_resize(simple, simple->length + length);
-        if (rc < 0) {
-                return rc;
+        if (simple->size < simple->length + length) {
+                rc = simple_buffer_resize(simple, simple->length + length);
+                if (rc < 0) {
+                        return rc;
+                }
         }
         iovecs[0].iov_base = simple->data + simple->length;
         iovecs[0].iov_len  = length;
