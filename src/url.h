@@ -12,6 +12,7 @@ void medusa_url_destroy (struct medusa_url *url);
 const char * medusa_url_get_scheme (struct medusa_url *url);
 const char * medusa_url_get_host (struct medusa_url *url);
 int medusa_url_get_port (struct medusa_url *url);
+int medusa_url_has_port (struct medusa_url *url);
 const char * medusa_url_get_path (struct medusa_url *url);
 const char * medusa_url_get_username (struct medusa_url *url);
 const char * medusa_url_get_password (struct medusa_url *url);

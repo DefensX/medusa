@@ -7,6 +7,10 @@
 #include "error.h"
 #include "url.h"
 
+enum {
+        MEDUSA_URL_FLAG_HAS_PORT = (1 << 0),
+};
+
 struct medusa_url {
         char *base;
         char *scheme;
@@ -15,6 +19,8 @@ struct medusa_url {
         char *path;
         char *username;
         char *password;
+
+        unsigned int flags;
 };
 
 static const struct {
@@ -123,6 +129,7 @@ struct medusa_url * medusa_url_parse (const char *uri)
         e = strchr(i, '/');
         if ((p != NULL) && (e == NULL || e > p) && (a == NULL || a < p)) {
                 url->port = atoi(p + 1);
+                url->flags |= MEDUSA_URL_FLAG_HAS_PORT;
                 *p = '\0';
         }
         if (e != NULL) {
@@ -208,6 +215,14 @@ int medusa_url_get_port (struct medusa_url *url)
                 return -EINVAL;
         }
         return url->port;
+}
+
+int medusa_url_has_port (struct medusa_url *url)
+{
+        if (url == NULL) {
+                return -EINVAL;
+        }
+        return (url->flags & MEDUSA_URL_FLAG_HAS_PORT) ? 1 : 0;
 }
 
 const char * medusa_url_get_path (struct medusa_url *url)
