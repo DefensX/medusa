@@ -2997,7 +2997,13 @@ ipv6:
 
                 rc = getaddrinfo(address, NULL, &hints, &result);
                 if (rc != 0) {
-                        ret = -EIO;
+                        if (rc == EAI_NONAME) {
+                                ret = -ENOENT;
+                        } else if (rc == EAI_AGAIN) {
+                                ret = -EAGAIN;
+                        } else {
+                                ret = -EIO;
+                        }
                         line = __LINE__;
                         goto bail;
                 }
