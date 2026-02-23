@@ -240,6 +240,7 @@ struct medusa_poll_backend * medusa_monitor_select_create (const struct medusa_m
                 goto bail;
         }
         memset(internal, 0, sizeof(struct internal));
+        internal->mfds    = -1;
         internal->onevent = options->onevent;
         internal->context = options->context;
         internal->backend.name    = "select";
