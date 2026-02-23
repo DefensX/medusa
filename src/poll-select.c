@@ -42,6 +42,7 @@ struct internal {
         fd_set _rfds;
         fd_set _wfds;
         fd_set _efds;
+        int mfds;
         struct medusa_io *ios[SELECT_FD_SETSIZE];
         int (*onevent) (struct medusa_poll_backend *backend, struct medusa_io *io, unsigned int events, void *context, void *param);
         void *context;
@@ -81,6 +82,7 @@ static int internal_add (struct medusa_poll_backend *backend, struct medusa_io *
         }
         FD_SET(io->fd, &internal->efds);
         internal->ios[io->fd] = io;
+        internal->mfds = MAX(internal->mfds, io->fd);
         return 0;
 bail:   return -1;
 }
@@ -141,6 +143,16 @@ static int internal_del (struct medusa_poll_backend *backend, struct medusa_io *
         FD_CLR(io->fd, &internal->wfds);
         FD_CLR(io->fd, &internal->efds);
         internal->ios[io->fd] = NULL;
+        if (io->fd >= internal->mfds) {
+                int i;
+                internal->mfds = -1;
+                for (i = io->fd - 1; i >= 0; i--) {
+                        if (internal->ios[i] != NULL) {
+                                internal->mfds = i;
+                                break;
+                        }
+                }
+        }
         return 0;
 bail:   return -1;
 }
@@ -168,7 +180,7 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
         memcpy(&internal->_rfds, &internal->rfds, sizeof(internal->rfds));
         memcpy(&internal->_wfds, &internal->wfds, sizeof(internal->wfds));
         memcpy(&internal->_efds, &internal->efds, sizeof(internal->efds));
-        count = select(SELECT_FD_SETSIZE, &internal->_rfds, &internal->_wfds, &internal->_efds, timeval);
+        count = select(internal->mfds + 1, &internal->_rfds, &internal->_wfds, &internal->_efds, timeval);
         if (count == 0) {
                 goto out;
         }
