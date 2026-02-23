@@ -190,7 +190,7 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
                 }
                 goto bail;
         }
-        for (i = 0; i < SELECT_FD_SETSIZE; i++) {
+        for (i = 0; i < internal->mfds + 1; i++) {
                 events = 0;
                 if (FD_ISSET(i, &internal->_rfds)) {
                         events |= MEDUSA_IO_EVENT_IN;
