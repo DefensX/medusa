@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <getopt.h>
 #include <signal.h>
+#include <time.h>
 #include <errno.h>
 
 #if defined(__WINDOWS__)
@@ -31,6 +32,7 @@ static int g_running;
 #define OPTION_CODE                     'c'
 #define OPTION_TYPE                     't'
 #define OPTION_NAME                     'n'
+#define OPTION_ID                       'i'
 static struct option longopts[] = {
         { "help",                       no_argument,            NULL,   OPTION_HELP             },
         { "nameserver",                 required_argument,      NULL,   OPTION_NAMESERVER       },
@@ -38,6 +40,7 @@ static struct option longopts[] = {
         { "code",                       required_argument,      NULL,   OPTION_CODE             },
         { "type",                       required_argument,      NULL,   OPTION_TYPE             },
         { "name",                       required_argument,      NULL,   OPTION_NAME             },
+        { "id",                         required_argument,      NULL,   OPTION_ID               },
         { NULL,                         0,                      NULL,   0                       },
 };
 
@@ -50,6 +53,7 @@ static void usage (const char *pname)
         fprintf(stdout, "  -c, --code      : op code (default: %s)\n", OPTION_CODE_DEFAULT);
         fprintf(stdout, "  -t, --type      : record type (default: %s)\n", OPTION_TYPE_DEFAULT);
         fprintf(stdout, "  -n, --name      : nameto lookup (default: %s)\n", OPTION_NAME_DEFAULT);
+        fprintf(stdout, "  -i, --id        : dns request id (default: random)\n");
 }
 
 static int dnsrequest_onevent (struct medusa_dnsrequest *dnsrequest, unsigned int events, void *context, void *param)
@@ -190,6 +194,7 @@ int main (int argc, char *argv[])
         const char *option_code;
         const char *option_type;
         const char *option_name;
+        int option_id;
 
         struct medusa_dnsrequest *medusa_dnsrequest;
 
@@ -198,6 +203,8 @@ int main (int argc, char *argv[])
 
         struct medusa_monitor *medusa_monitor;
         struct medusa_monitor_init_options medusa_monitor_init_options;
+
+        srand(time(NULL));
 
 #if defined(__WINDOWS__)
         WSADATA wsaData;
@@ -212,10 +219,11 @@ int main (int argc, char *argv[])
         option_code             = OPTION_CODE_DEFAULT;
         option_type             = OPTION_TYPE_DEFAULT;
         option_name             = OPTION_NAME_DEFAULT;
+        option_id               = rand() & 0xffff;
 
         g_running = 1;
 
-        while ((c = getopt_long(argc, argv, "hs:p:c:t:n:", longopts, NULL)) != -1) {
+        while ((c = getopt_long(argc, argv, "hs:p:c:t:n:i:", longopts, NULL)) != -1) {
                 switch (c) {
                         case OPTION_HELP:
                                 usage(argv[0]);
@@ -234,6 +242,9 @@ int main (int argc, char *argv[])
                                 break;
                         case OPTION_NAME:
                                 option_name = optarg;
+                                break;
+                        case OPTION_ID:
+                                option_id = atoi(optarg);
                                 break;
                         default:
                                 fprintf(stderr, "unknown option: %d\n", optopt);
@@ -258,6 +269,7 @@ int main (int argc, char *argv[])
         fprintf(stderr, "  code      : %s, %d\n", option_code, medusa_dnsrequest_opcode_value(option_code));
         fprintf(stderr, "  type      : %s, %d\n", option_type, medusa_dnsrequest_record_type_value(option_type));
         fprintf(stderr, "  name      : %s\n", option_name);
+        fprintf(stderr, "  id        : %d\n", option_id);
 
         rc = medusa_monitor_init_options_default(&medusa_monitor_init_options);
         if (rc < 0) {
@@ -317,6 +329,11 @@ int main (int argc, char *argv[])
                 goto out;
         }
         rc = medusa_dnsrequest_set_name(medusa_dnsrequest, option_name);
+        if (rc != 0) {
+                err = rc;
+                goto out;
+        }
+        rc = medusa_dnsrequest_set_id(medusa_dnsrequest, option_id);
         if (rc != 0) {
                 err = rc;
                 goto out;
