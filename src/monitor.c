@@ -1209,20 +1209,20 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                                 break;
                         }
 #endif
-#if defined(MEDUSA_POLL_SELECT_ENABLE) && (MEDUSA_POLL_SELECT_ENABLE == 1)
-                        struct medusa_monitor_select_init_options select_init_options;
-                        select_init_options.onevent = monitor_poll_io_onevent;
-                        select_init_options.context = monitor;
-                        monitor->poll.backend = medusa_monitor_select_create(&select_init_options);
-                        if (monitor->poll.backend != NULL) {
-                                break;
-                        }
-#endif
 #if defined(MEDUSA_POLL_WSAPOLL_ENABLE) && (MEDUSA_POLL_WSAPOLL_ENABLE == 1)
                         struct medusa_monitor_wsapoll_init_options wsapoll_init_options;
                         wsapoll_init_options.onevent = monitor_poll_io_onevent;
                         wsapoll_init_options.context = monitor;
                         monitor->poll.backend = medusa_monitor_wsapoll_create(&wsapoll_init_options);
+                        if (monitor->poll.backend != NULL) {
+                                break;
+                        }
+#endif
+#if defined(MEDUSA_POLL_SELECT_ENABLE) && (MEDUSA_POLL_SELECT_ENABLE == 1)
+                        struct medusa_monitor_select_init_options select_init_options;
+                        select_init_options.onevent = monitor_poll_io_onevent;
+                        select_init_options.context = monitor;
+                        monitor->poll.backend = medusa_monitor_select_create(&select_init_options);
                         if (monitor->poll.backend != NULL) {
                                 break;
                         }
