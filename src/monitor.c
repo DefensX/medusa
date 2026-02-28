@@ -62,6 +62,7 @@
 #include "poll-kqueue.h"
 #include "poll-poll.h"
 #include "poll-select.h"
+#include "poll-wsapoll.h"
 #include "poll-backend.h"
 
 #include "signal-sigaction.h"
@@ -1217,6 +1218,15 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                                 break;
                         }
 #endif
+#if defined(MEDUSA_POLL_WSAPOLL_ENABLE) && (MEDUSA_POLL_WSAPOLL_ENABLE == 1)
+                        struct medusa_monitor_wsapoll_init_options wsapoll_init_options;
+                        wsapoll_init_options.onevent = monitor_poll_io_onevent;
+                        wsapoll_init_options.context = monitor;
+                        monitor->poll.backend = medusa_monitor_wsapoll_create(&wsapoll_init_options);
+                        if (monitor->poll.backend != NULL) {
+                                break;
+                        }
+#endif
                 } while (0);
 #if defined(MEDUSA_POLL_EPOLL_ENABLE) && (MEDUSA_POLL_EPOLL_ENABLE == 1)
         } else if (options->poll.type == MEDUSA_MONITOR_POLL_EPOLL) {
@@ -1245,8 +1255,15 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                 select_init_options.onevent = monitor_poll_io_onevent;
                 select_init_options.context = monitor;
                 monitor->poll.backend = medusa_monitor_select_create(&select_init_options);
-        } else {
 #endif
+#if defined(MEDUSA_POLL_WSAPOLL_ENABLE) && (MEDUSA_POLL_WSAPOLL_ENABLE == 1)
+        } else if (options->poll.type == MEDUSA_MONITOR_POLL_WSAPOLL) {
+                struct medusa_monitor_wsapoll_init_options wsapoll_init_options;
+                wsapoll_init_options.onevent = monitor_poll_io_onevent;
+                wsapoll_init_options.context = monitor;
+                monitor->poll.backend = medusa_monitor_wsapoll_create(&wsapoll_init_options);
+#endif
+        } else {
                 medusa_errorf("invalid poll type: %d", options->poll.type);
                 goto bail;
         }
