@@ -4,14 +4,12 @@
 #include <errno.h>
 #include <time.h>
 
-#if defined(__WINDOWS__)
 #if !defined(_WIN32_WINNT) || (_WIN32_WINNT < 0x0600)
 #undef _WIN32_WINNT
 #define _WIN32_WINNT 0x0600
 #endif
 #include <winsock2.h>
 #include <ws2tcpip.h>
-#endif
 
 #define MEDUSA_DEBUG_NAME       "poll-wsapoll"
 
@@ -24,8 +22,6 @@
 
 #include "poll-backend.h"
 #include "poll-wsapoll.h"
-
-#if defined(__WINDOWS__)
 
 #define MAX(a, b)       (((a) > (b)) ? (a) : (b))
 
@@ -208,7 +204,7 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
                 /* Windows WSAPoll specific behavior for CONNECTING state:
                  * when connect() fails, WSAPoll might set POLLERR and POLLHUP instead of standard write event
                  * for connecting socket. We handle POLLERR manually if it occurs. */
-                 
+
                 events = 0;
                 if (internal->pfds[i].revents & POLLRDNORM) {
                         events |= MEDUSA_IO_EVENT_IN;
@@ -287,5 +283,3 @@ bail:   if (internal != NULL) {
         }
         return NULL;
 }
-
-#endif /* __WINDOWS__ */
