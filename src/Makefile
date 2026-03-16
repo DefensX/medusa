@@ -6,6 +6,10 @@ override MEDUSA_SIGNAL_SIGNALFD_ENABLE	= n
 override MEDUSA_TIMER_TIMERFD_ENABLE  	= n
 endif
 
+ifneq ($(__WINDOWS__), y)
+override MEDUSA_POLL_WSAPOLL_ENABLE     = n
+endif
+
 ifneq ($(__DARWIN__), y)
 override MEDUSA_POLL_KQUEUE_ENABLE    	= n
 endif
@@ -13,6 +17,8 @@ endif
 ifeq ($(__WINDOWS__), y)
 override MEDUSA_EXEC_ENABLE		= n
 override MEDUSA_POLL_POLL_ENABLE   	= n
+override MEDUSA_POLL_SELECT_ENABLE      = n
+override MEDUSA_POLL_WSAPOLL_ENABLE     = y
 override MEDUSA_SIGNAL_SIGACTION_ENABLE	= n
 override MEDUSA_SIGNAL_SIGNALFD_ENABLE	= n
 override MEDUSA_LIBMEDUSA_TARGET_O	= n
@@ -75,6 +81,11 @@ libmedusa.a_cflags-${MEDUSA_POLL_SELECT_ENABLE} += \
 	-DMEDUSA_POLL_SELECT_ENABLE=1
 libmedusa.a_files-${MEDUSA_POLL_SELECT_ENABLE} += \
 	poll-select.c
+
+libmedusa.a_cflags-${MEDUSA_POLL_WSAPOLL_ENABLE} += \
+	-DMEDUSA_POLL_WSAPOLL_ENABLE=1
+libmedusa.a_files-${MEDUSA_POLL_WSAPOLL_ENABLE} += \
+	poll-wsapoll.c
 
 libmedusa.a_cflags-${MEDUSA_TIMER_TIMERFD_ENABLE} += \
 	-DMEDUSA_TIMER_TIMERFD_ENABLE=1
