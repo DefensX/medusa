@@ -7,7 +7,15 @@
 
 ## 1. overview ##
 
-medusa
+Medusa is an asynchronous event notification library. It executes registered callback functions when specific events occur on file descriptors, after timeouts, or in response to signals.
+
+Beyond basic I/O monitoring, Medusa provides a full async networking stack — TCP sockets, UDP sockets, and WebSockets, each supporting both server and client roles within the same event-driven model.
+
+The API surface includes conditional signal events, timers, DNS request and resolver primitives, an executor, HTTP request and HTTP server implementations, and raw I/O operations. Internally, object state changes (modified, deleted, created) are tracked through priority queues and object trees, converging into a single-point execution within the event loop to keep dispatch fast and deterministic.
+
+Multiple platform-native loop backends are supported — epoll, kqueue, poll, select — chosen at build time or runtime. A software signal mechanism handles internal async event propagation between components.
+
+The result is a low-footprint, high-throughput event engine with tendrils reaching into every I/O path — like its namesake, with strands tied to everything, and equally charming.
 
 ## 2. download ##
 
