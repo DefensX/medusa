@@ -126,6 +126,15 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
                 medusa_monitor_break(medusa_httprequest_get_monitor(httprequest));
         }
         if (events & MEDUSA_HTTPREQUEST_EVENT_ERROR) {
+                struct medusa_httprequest_event_error *medusa_httprequest_event_error = (struct medusa_httprequest_event_error *) param;
+                fprintf(stderr, "request failed for request, %s\n", medusa_httprequest_event_string(events));
+                fprintf(stderr, "  state : %d, error: %d, line: %d, reason: %d\n", medusa_httprequest_event_error->state, medusa_httprequest_event_error->error, medusa_httprequest_event_error->line, medusa_httprequest_event_error->reason);
+                if (medusa_httprequest_event_error->reason == MEDUSA_HTTPREQUEST_ERROR_REASON_PARSER) {
+                        fprintf(stderr, "  parser.error: %d\n", medusa_httprequest_event_error->u.parser.error);
+                }
+                if (medusa_httprequest_event_error->reason == MEDUSA_HTTPREQUEST_ERROR_REASON_TCPSOCKET) {
+                        fprintf(stderr, "  tcpsocket.state: %d, error: %d, line: %d\n", medusa_httprequest_event_error->u.tcpsocket.state, medusa_httprequest_event_error->u.tcpsocket.error, medusa_httprequest_event_error->u.tcpsocket.line);
+                }
                 medusa_monitor_break(medusa_httprequest_get_monitor(httprequest));
         }
         if (events & MEDUSA_HTTPREQUEST_EVENT_DESTROY) {

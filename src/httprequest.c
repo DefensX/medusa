@@ -197,10 +197,18 @@ static int medusa_httprequest_reply_header_set_value (struct medusa_httprequest_
                 return -EINVAL;
         }
         if (value == NULL) {
-                return -EINVAL;
+                if (header->value != NULL) {
+                        free(header->value);
+                        header->value = NULL;
+                }
+                return 0;
         }
         if (length <= 0) {
-                return -EINVAL;
+                if (header->value != NULL) {
+                        free(header->value);
+                        header->value = NULL;
+                }
+                return 0;
         }
         if (header->value != NULL) {
                 char *tmp = realloc(header->value, strlen(header->value) + length + 1);
