@@ -197,17 +197,9 @@ static int medusa_httprequest_reply_header_set_value (struct medusa_httprequest_
                 return -EINVAL;
         }
         if (value == NULL) {
-                if (header->value != NULL) {
-                        free(header->value);
-                        header->value = NULL;
-                }
                 return 0;
         }
         if (length <= 0) {
-                if (header->value != NULL) {
-                        free(header->value);
-                        header->value = NULL;
-                }
                 return 0;
         }
         if (header->value != NULL) {
