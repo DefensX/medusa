@@ -1465,7 +1465,7 @@ static int medusa_httpserver_client_request_set_url (struct medusa_httpserver_cl
         if (length == 0) {
                 return 0;
         }
-        if (length > 0) {
+        if (request->url == NULL) {
                 request->url = medusa_strndup(url, length);
                 if (request->url == NULL) {
                         return -ENOMEM;
