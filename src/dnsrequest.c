@@ -1167,6 +1167,7 @@ static int dnsrequest_udpsocket_onevent (struct medusa_udpsocket *udpsocket, uns
 
                 dns_decoded_t  bufresult[DNS_DECODEBUF_8K];
                 size_t         bufsize;
+                size_t         parsize;
 
                 replysize = sizeof(reply);
 
@@ -1218,7 +1219,8 @@ static int dnsrequest_udpsocket_onevent (struct medusa_udpsocket *udpsocket, uns
                 replysize = rc;
 
                 bufsize = sizeof(bufresult);
-                rc = dns_decode(bufresult, &bufsize, reply, replysize);
+                parsize = replysize;
+                rc = dns_decode(bufresult, &bufsize, reply, &parsize);
                 if (rc != RCODE_OKAY) {
                         struct medusa_dnsrequest_event_error medusa_dnsrequest_event_error;
                         medusa_dnsrequest_event_error.state = dnsrequest->state;
