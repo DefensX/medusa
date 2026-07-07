@@ -98,11 +98,21 @@ struct medusa_udpsocket_open_options {
 
 struct medusa_udpsocket_connect_options {
         struct medusa_monitor *monitor;
+        struct medusa_dnsresolver *dnsresolver;
         int (*onevent) (struct medusa_udpsocket *udpsocket, unsigned int events, void *context, void *param);
         void *context;
         unsigned int protocol;
         const char *address;
         unsigned short port;
+        unsigned int sprotocol;
+        const char *saddress;
+        unsigned short sport;
+        double resolve_timeout;
+        double read_timeout;
+        int fd;
+        int clodestroy;
+        int reuseaddr;
+        int reuseport;
         int nonblocking;
         int enabled;
 };
@@ -162,6 +172,9 @@ int medusa_udpsocket_get_enabled (const struct medusa_udpsocket *udpsocket);
 int medusa_udpsocket_enable (struct medusa_udpsocket *udpsocket);
 int medusa_udpsocket_disable (struct medusa_udpsocket *udpsocket);
 
+int medusa_udpsocket_set_clodestroy (struct medusa_udpsocket *udpsocket, int enabled);
+int medusa_udpsocket_get_clodestroy (const struct medusa_udpsocket *udpsocket);
+
 int medusa_udpsocket_set_nonblocking (struct medusa_udpsocket *udpsocket, int enabled);
 int medusa_udpsocket_get_nonblocking (const struct medusa_udpsocket *udpsocket);
 
@@ -173,6 +186,9 @@ int medusa_udpsocket_get_reuseport (const struct medusa_udpsocket *udpsocket);
 
 int medusa_udpsocket_set_freebind (struct medusa_udpsocket *udpsocket, int enabled);
 int medusa_udpsocket_get_freebind (const struct medusa_udpsocket *udpsocket);
+
+int medusa_udpsocket_set_resolve_timeout (struct medusa_udpsocket *udpsocket, double timeout);
+double medusa_udpsocket_get_resolve_timeout (const struct medusa_udpsocket *udpsocket);
 
 int medusa_udpsocket_set_read_timeout (struct medusa_udpsocket *udpsocket, double timeout);
 double medusa_udpsocket_get_read_timeout (const struct medusa_udpsocket *udpsocket);

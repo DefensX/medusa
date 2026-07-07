@@ -24,6 +24,9 @@ int medusa_udpsocket_get_error_unlocked (const struct medusa_udpsocket *udpsocke
 int medusa_udpsocket_set_enabled_unlocked (struct medusa_udpsocket *udpsocket, int enabled);
 int medusa_udpsocket_get_enabled_unlocked (const struct medusa_udpsocket *udpsocket);
 
+int medusa_udpsocket_set_clodestroy_unlocked (struct medusa_udpsocket *udpsocket, int enabled);
+int medusa_udpsocket_get_clodestroy_unlocked (const struct medusa_udpsocket *udpsocket);
+
 int medusa_udpsocket_set_nonblocking_unlocked (struct medusa_udpsocket *udpsocket, int enabled);
 int medusa_udpsocket_get_nonblocking_unlocked (const struct medusa_udpsocket *udpsocket);
 
@@ -35,6 +38,9 @@ int medusa_udpsocket_get_reuseport_unlocked (const struct medusa_udpsocket *udps
 
 int medusa_udpsocket_set_freebind_unlocked (struct medusa_udpsocket *udpsocket, int enabled);
 int medusa_udpsocket_get_freebind_unlocked (const struct medusa_udpsocket *udpsocket);
+
+int medusa_udpsocket_set_resolve_timeout_unlocked (struct medusa_udpsocket *udpsocket, double timeout);
+double medusa_udpsocket_get_resolve_timeout_unlocked (const struct medusa_udpsocket *udpsocket);
 
 int medusa_udpsocket_set_read_timeout_unlocked (struct medusa_udpsocket *udpsocket, double timeout);
 double medusa_udpsocket_get_read_timeout_unlocked (const struct medusa_udpsocket *udpsocket);
