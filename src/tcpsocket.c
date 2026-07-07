@@ -2179,8 +2179,6 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_connect_options_de
         return 0;
 }
 
-static int medusa_tcpsocket_connect_resolved (struct medusa_tcpsocket *tcpsocket, const struct medusa_tcpsocket_connect_options *options, struct tcpsocket_addrinfo *addrinfo);
-
 static void medusa_tcpsocket_connect_options_destroy (struct medusa_tcpsocket_connect_options *options)
 {
         if (options == NULL) {
@@ -2254,95 +2252,6 @@ bail:   if (options != NULL) {
                 medusa_tcpsocket_connect_options_destroy(options);
         }
         return MEDUSA_ERR_PTR(rs);
-}
-
-static int tcpsocket_dnsresolver_onevent (struct medusa_dnsresolver_lookup *dnsresolver_lookup, unsigned int events, void *context, void *param)
-{
-        int rc;
-        struct tcpsocket_addrinfo *tcpsocket_addrinfo;
-        struct tcpsocket_addrinfo_entry *tcpsocket_addrinfo_entry;
-
-        struct medusa_tcpsocket *tcpsocket = context;
-        struct medusa_monitor *monitor = medusa_tcpsocket_get_monitor(tcpsocket);
-
-        medusa_monitor_lock(monitor);
-
-        if (events & MEDUSA_DNSRESOLVER_LOOKUP_EVENT_ENTRY) {
-                struct medusa_dnsresolver_lookup_event_entry *medusa_dnsresolver_lookup_event_entry = param;
-
-                tcpsocket_addrinfo = medusa_dnsresolver_lookup_get_userdata_ptr_unlocked(dnsresolver_lookup);
-                if (tcpsocket_addrinfo == NULL) {
-                        tcpsocket_addrinfo = tcpsocket_addrinfo_create();
-                        if (tcpsocket_addrinfo == NULL) {
-                                medusa_errorf("can not create addrinfo");
-                                goto error;
-                        }
-                        rc = medusa_dnsresolver_lookup_set_userdata_ptr_unlocked(dnsresolver_lookup, tcpsocket_addrinfo);
-                        if (rc < 0) {
-                                medusa_errorf("can not set userdata ptr");
-                                tcpsocket_addrinfo_destroy(tcpsocket_addrinfo);
-                                goto error;
-                        }
-                }
-
-                tcpsocket_addrinfo_entry = tcpsocket_addrinfo_entry_create_from_dnsresolver(medusa_dnsresolver_lookup_event_entry);
-                if (tcpsocket_addrinfo_entry == NULL) {
-                        medusa_errorf("can not create entry from dnsresolver");
-                        goto error;
-                }
-
-                rc = tcpsocket_addrinfo_add_entry(tcpsocket_addrinfo, tcpsocket_addrinfo_entry);
-                if (rc < 0) {
-                        medusa_errorf("can not add addrinfo entry");
-                        tcpsocket_addrinfo_entry_destroy(tcpsocket_addrinfo_entry);
-                        goto error;
-                }
-        }
-        if (events & MEDUSA_DNSRESOLVER_LOOKUP_EVENT_FINISHED) {
-                tcpsocket_addrinfo = medusa_dnsresolver_lookup_get_userdata_ptr_unlocked(dnsresolver_lookup);
-                if (tcpsocket_addrinfo == NULL) {
-                        goto error;
-                } else {
-                        rc = medusa_tcpsocket_connect_resolved(tcpsocket, tcpsocket->coptions, tcpsocket_addrinfo);
-                        medusa_dnsresolver_lookup_set_userdata_ptr_unlocked(dnsresolver_lookup, NULL);
-                        tcpsocket_addrinfo_destroy(tcpsocket_addrinfo);
-                        if (rc < 0) {
-                                medusa_errorf("can not connect to resolved");
-                                goto error;
-                        }
-                }
-        }
-        if (events & MEDUSA_DNSRESOLVER_LOOKUP_EVENT_TIMEDOUT) {
-                medusa_debugf("dnsresolver lookup timeout");
-        }
-        if (events & MEDUSA_DNSRESOLVER_LOOKUP_EVENT_ERROR) {
-                medusa_errorf("dnsresolver lookup error");
-                goto error;
-        }
-        if (events & MEDUSA_DNSRESOLVER_LOOKUP_EVENT_DESTROY) {
-                tcpsocket_addrinfo = medusa_dnsresolver_lookup_get_userdata_ptr_unlocked(dnsresolver_lookup);
-                if (tcpsocket_addrinfo != NULL) {
-                        medusa_dnsresolver_lookup_set_userdata_ptr_unlocked(dnsresolver_lookup, NULL);
-                        tcpsocket_addrinfo_destroy(tcpsocket_addrinfo);
-                }
-                if (tcpsocket != NULL) {
-                        tcpsocket->clookup = NULL;
-                }
-        }
-
-        medusa_monitor_unlock(monitor);
-        return 0;
-error:  {
-
-                struct medusa_tcpsocket_event_error medusa_tcpsocket_event_error;
-                medusa_tcpsocket_event_error.state = tcpsocket->state;
-                medusa_tcpsocket_event_error.error = -EIO;
-                medusa_tcpsocket_event_error.line  = __LINE__;
-                tcpsocket_set_state(tcpsocket, MEDUSA_TCPSOCKET_STATE_ERROR, medusa_tcpsocket_event_error.error, __LINE__);
-                medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_ERROR, &medusa_tcpsocket_event_error);
-        }
-        medusa_monitor_unlock(monitor);
-        return 0;
 }
 
 static int medusa_tcpsocket_connect_resolved (struct medusa_tcpsocket *tcpsocket, const struct medusa_tcpsocket_connect_options *options, struct tcpsocket_addrinfo *addrinfo)
@@ -2746,6 +2655,95 @@ bind_ipv6:
 
         return 0;
 bail:   return ret;
+}
+
+static int tcpsocket_dnsresolver_onevent (struct medusa_dnsresolver_lookup *dnsresolver_lookup, unsigned int events, void *context, void *param)
+{
+        int rc;
+        struct tcpsocket_addrinfo *tcpsocket_addrinfo;
+        struct tcpsocket_addrinfo_entry *tcpsocket_addrinfo_entry;
+
+        struct medusa_tcpsocket *tcpsocket = context;
+        struct medusa_monitor *monitor = medusa_tcpsocket_get_monitor(tcpsocket);
+
+        medusa_monitor_lock(monitor);
+
+        if (events & MEDUSA_DNSRESOLVER_LOOKUP_EVENT_ENTRY) {
+                struct medusa_dnsresolver_lookup_event_entry *medusa_dnsresolver_lookup_event_entry = param;
+
+                tcpsocket_addrinfo = medusa_dnsresolver_lookup_get_userdata_ptr_unlocked(dnsresolver_lookup);
+                if (tcpsocket_addrinfo == NULL) {
+                        tcpsocket_addrinfo = tcpsocket_addrinfo_create();
+                        if (tcpsocket_addrinfo == NULL) {
+                                medusa_errorf("can not create addrinfo");
+                                goto error;
+                        }
+                        rc = medusa_dnsresolver_lookup_set_userdata_ptr_unlocked(dnsresolver_lookup, tcpsocket_addrinfo);
+                        if (rc < 0) {
+                                medusa_errorf("can not set userdata ptr");
+                                tcpsocket_addrinfo_destroy(tcpsocket_addrinfo);
+                                goto error;
+                        }
+                }
+
+                tcpsocket_addrinfo_entry = tcpsocket_addrinfo_entry_create_from_dnsresolver(medusa_dnsresolver_lookup_event_entry);
+                if (tcpsocket_addrinfo_entry == NULL) {
+                        medusa_errorf("can not create entry from dnsresolver");
+                        goto error;
+                }
+
+                rc = tcpsocket_addrinfo_add_entry(tcpsocket_addrinfo, tcpsocket_addrinfo_entry);
+                if (rc < 0) {
+                        medusa_errorf("can not add addrinfo entry");
+                        tcpsocket_addrinfo_entry_destroy(tcpsocket_addrinfo_entry);
+                        goto error;
+                }
+        }
+        if (events & MEDUSA_DNSRESOLVER_LOOKUP_EVENT_FINISHED) {
+                tcpsocket_addrinfo = medusa_dnsresolver_lookup_get_userdata_ptr_unlocked(dnsresolver_lookup);
+                if (tcpsocket_addrinfo == NULL) {
+                        goto error;
+                } else {
+                        rc = medusa_tcpsocket_connect_resolved(tcpsocket, tcpsocket->coptions, tcpsocket_addrinfo);
+                        medusa_dnsresolver_lookup_set_userdata_ptr_unlocked(dnsresolver_lookup, NULL);
+                        tcpsocket_addrinfo_destroy(tcpsocket_addrinfo);
+                        if (rc < 0) {
+                                medusa_errorf("can not connect to resolved");
+                                goto error;
+                        }
+                }
+        }
+        if (events & MEDUSA_DNSRESOLVER_LOOKUP_EVENT_TIMEDOUT) {
+                medusa_debugf("dnsresolver lookup timeout");
+        }
+        if (events & MEDUSA_DNSRESOLVER_LOOKUP_EVENT_ERROR) {
+                medusa_errorf("dnsresolver lookup error");
+                goto error;
+        }
+        if (events & MEDUSA_DNSRESOLVER_LOOKUP_EVENT_DESTROY) {
+                tcpsocket_addrinfo = medusa_dnsresolver_lookup_get_userdata_ptr_unlocked(dnsresolver_lookup);
+                if (tcpsocket_addrinfo != NULL) {
+                        medusa_dnsresolver_lookup_set_userdata_ptr_unlocked(dnsresolver_lookup, NULL);
+                        tcpsocket_addrinfo_destroy(tcpsocket_addrinfo);
+                }
+                if (tcpsocket != NULL) {
+                        tcpsocket->clookup = NULL;
+                }
+        }
+
+        medusa_monitor_unlock(monitor);
+        return 0;
+error:  {
+
+                struct medusa_tcpsocket_event_error medusa_tcpsocket_event_error;
+                medusa_tcpsocket_event_error.state = tcpsocket->state;
+                medusa_tcpsocket_event_error.error = -EIO;
+                medusa_tcpsocket_event_error.line  = __LINE__;
+                tcpsocket_set_state(tcpsocket, MEDUSA_TCPSOCKET_STATE_ERROR, medusa_tcpsocket_event_error.error, __LINE__);
+                medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_ERROR, &medusa_tcpsocket_event_error);
+        }
+        medusa_monitor_unlock(monitor);
+        return 0;
 }
 
 __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsocket_connect_with_options_unlocked (const struct medusa_tcpsocket_connect_options *options)
