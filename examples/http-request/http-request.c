@@ -66,7 +66,7 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
         (void) events;
         (void) context;
         (void) param;
-        fprintf(stderr, "httprequest state: %d, %s events: 0x%08x, %s\n", medusa_httprequest_get_state(httprequest), medusa_httprequest_state_string(medusa_httprequest_get_state(httprequest)), events, medusa_httprequest_event_string(events));
+        fprintf(stderr, "httprequest state: %d, %-35s events: 0x%08x, %s\n", medusa_httprequest_get_state(httprequest), medusa_httprequest_state_string(medusa_httprequest_get_state(httprequest)), events, medusa_httprequest_event_string(events));
         if (events & MEDUSA_HTTPREQUEST_EVENT_REQUESTED) {
         }
         if (events & MEDUSA_HTTPREQUEST_EVENT_RECEIVED) {
