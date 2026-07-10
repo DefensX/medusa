@@ -96,12 +96,11 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
                         fprintf(stderr, "hettprequest reply headers is invalid\n");
                         goto bail;
                 }
-                fprintf(stderr, "headers:\n");
-                fprintf(stderr, "  count: %lld\n", (long long int) medusa_httprequest_reply_headers_get_count(httprequest_reply_headers));
+                fprintf(stderr, "headers: %lld\n", (long long int) medusa_httprequest_reply_headers_get_count(httprequest_reply_headers));
                 for (httprequest_reply_header = medusa_httprequest_reply_headers_get_first(httprequest_reply_headers);
                      httprequest_reply_header;
                      httprequest_reply_header = medusa_httprequest_reply_header_get_next(httprequest_reply_header)) {
-                        fprintf(stderr, "  %s = %s\n",
+                        fprintf(stderr, "  %-15s : %s\n",
                                 medusa_httprequest_reply_header_get_key(httprequest_reply_header),
                                 medusa_httprequest_reply_header_get_value(httprequest_reply_header));
                 }
