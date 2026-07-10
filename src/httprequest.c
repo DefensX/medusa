@@ -1392,21 +1392,16 @@ __attribute__ ((visibility ("default"))) int medusa_httprequest_add_header_unloc
         if (MEDUSA_IS_ERR_OR_NULL(key)) {
                 return -EINVAL;
         }
-        rc  = medusa_buffer_printf(httprequest->headers, "%s", key);
-        if (rc < 0) {
-                return rc;
+        if (strlen(key) == 0) {
+                return -EINVAL;
         }
-        if (value != NULL) {
-                rc = medusa_buffer_printf(httprequest->headers, ": ");
-                if (rc < 0) {
-                        return rc;
-                }
-                rc = medusa_buffer_printf(httprequest->headers, "%s", value);
-                if (rc < 0) {
-                        return rc;
-                }
+        if (key != NULL && strpbrk(key, "\r\n") != NULL) {
+                return -EINVAL;
         }
-        rc = medusa_buffer_printf(httprequest->headers, "\r\n");
+        if (value != NULL && strpbrk(value, "\r\n") != NULL) {
+                return -EINVAL;
+        }
+        rc = medusa_buffer_printf(httprequest->headers, "%s: %s\r\n", key, (value != NULL) ? value : "");
         if (rc < 0) {
                 return rc;
         }
