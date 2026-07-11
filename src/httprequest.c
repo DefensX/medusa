@@ -590,7 +590,7 @@ static int httprequest_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket, un
                         int64_t niovecs;
                         struct medusa_iovec iovec;
 
-                        niovecs = medusa_buffer_peekv(medusa_tcpsocket_get_read_buffer_unlocked(httprequest->tcpsocket), 0, -1, &iovec, 1);
+                        niovecs = medusa_buffer_peekv(medusa_tcpsocket_get_read_buffer_unlocked(tcpsocket), 0, -1, &iovec, 1);
                         if (niovecs < 0) {
                                 medusa_errorf("medusa_buffer_peekv failed, niovecs: %d", (int) niovecs);
                                 goto bail;
@@ -630,7 +630,7 @@ static int httprequest_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket, un
                                 }
                                 break;
                         }
-                        clength = medusa_buffer_choke(medusa_tcpsocket_get_read_buffer_unlocked(httprequest->tcpsocket), 0, nparsed);
+                        clength = medusa_buffer_choke(medusa_tcpsocket_get_read_buffer_unlocked(tcpsocket), 0, nparsed);
                         if (clength != (int64_t) nparsed) {
                                 medusa_errorf("medusa_buffer_choke failed, clength: %d / %d", (int) clength, (int) nparsed);
                                 goto bail;
