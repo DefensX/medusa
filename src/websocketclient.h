@@ -111,6 +111,8 @@ struct medusa_websocketclient_connect_options {
 struct medusa_websocketclient_event_state_changed {
         unsigned int pstate;
         unsigned int state;
+        unsigned int error;
+        unsigned int line;
 };
 
 struct medusa_websocketclient_event_response_header {

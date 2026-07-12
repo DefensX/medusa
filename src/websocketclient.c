@@ -99,12 +99,11 @@ static inline int websocketclient_has_flag (const struct medusa_websocketclient 
         return !!(websocketclient->flags & flag);
 }
 
-static inline int websocketclient_set_state (struct medusa_websocketclient *websocketclient, unsigned int state)
+static inline int websocketclient_set_state (struct medusa_websocketclient *websocketclient, unsigned int state, int error, int line)
 {
         int rc;
         unsigned int pstate;
         struct medusa_websocketclient_event_state_changed medusa_websocketclient_event_state_changed;
-        websocketclient->error = 0;
         if (state == MEDUSA_WEBSOCKETCLIENT_STATE_ERROR) {
                 if (!MEDUSA_IS_ERR_OR_NULL(websocketclient->tcpsocket)) {
                         medusa_tcpsocket_destroy_unlocked(websocketclient->tcpsocket);
@@ -119,8 +118,11 @@ static inline int websocketclient_set_state (struct medusa_websocketclient *webs
         }
         pstate = websocketclient->state;
         websocketclient->state = state;
+        websocketclient->error = error;
         medusa_websocketclient_event_state_changed.pstate = pstate;
         medusa_websocketclient_event_state_changed.state  = websocketclient->state;
+        medusa_websocketclient_event_state_changed.error  = websocketclient->error;
+        medusa_websocketclient_event_state_changed.line   = line;
         rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_STATE_CHANGED, &medusa_websocketclient_event_state_changed);
         if (rc < 0) {
                 return rc;
@@ -292,7 +294,7 @@ static int websocketclient_httpparser_on_message_complete (http_parser *http_par
         int rc;
         struct medusa_websocketclient *websocketclient = http_parser->data;
         (void) websocketclient;
-        rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_RESPONSE_RECEIVED);
+        rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_RESPONSE_RECEIVED, 0, __LINE__);
         if (rc < 0) {
                 return rc;
         }
@@ -334,29 +336,29 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
         medusa_monitor_lock(monitor);
 
         if (events & MEDUSA_TCPSOCKET_EVENT_RESOLVE_TIMEOUT) {
+                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_DISCONNECTED, 0, __LINE__);
+                if (rc < 0) {
+                        medusa_errorf("websocketclient_set_state failed, rc: %d", rc);
+                        error = rc;
+                        goto bail;
+                }
                 rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_RESOLVE_TIMEOUT, NULL);
                 if (rc < 0) {
                         medusa_errorf("medusa_websocketclient_onevent_unlocked failed, rc: %d", rc);
                         error = rc;
                         goto bail;
                 }
-                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_DISCONNECTED);
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_CONNECT_TIMEOUT) {
+                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_DISCONNECTED, 0, __LINE__);
                 if (rc < 0) {
                         medusa_errorf("websocketclient_set_state failed, rc: %d", rc);
                         error = rc;
                         goto bail;
                 }
-        }
-        if (events & MEDUSA_TCPSOCKET_EVENT_CONNECT_TIMEOUT) {
                 rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_CONNECT_TIMEOUT, NULL);
                 if (rc < 0) {
                         medusa_errorf("medusa_websocketclient_onevent_unlocked failed, rc: %d", rc);
-                        error = rc;
-                        goto bail;
-                }
-                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_DISCONNECTED);
-                if (rc < 0) {
-                        medusa_errorf("websocketclient_set_state failed, rc: %d", rc);
                         error = rc;
                         goto bail;
                 }
@@ -366,14 +368,14 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
                 int l;
                 char key_nonce[16];
 
-                rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_SENDING_REQUEST, NULL);
+                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_SENDING_REQUEST, 0, __LINE__);
                 if (rc < 0) {
+                        medusa_errorf("websocketclient_set_state failed, rc: %d", rc);
                         error = rc;
                         goto bail;
                 }
-                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_SENDING_REQUEST);
+                rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_SENDING_REQUEST, NULL);
                 if (rc < 0) {
-                        medusa_errorf("websocketclient_set_state failed, rc: %d", rc);
                         error = rc;
                         goto bail;
                 }
@@ -407,7 +409,12 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
 			websocketclient->sec_websocket_key);
                 if (rc < 0) {
                         struct medusa_websocketclient_event_error medusa_websocketclient_event_error;
-                        websocketclient->error = rc;
+                        rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR, -rc, __LINE__);
+                        if (rc < 0) {
+                                medusa_errorf("websocketclient_set_state failed, rc: %d", rc);
+                                error = rc;
+                                goto bail;
+                        }
                         medusa_websocketclient_event_error.state  = websocketclient->state;
                         medusa_websocketclient_event_error.error  = websocketclient->error;
                         medusa_websocketclient_event_error.line   = __LINE__;
@@ -417,23 +424,17 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
                                 error = rc;
                                 goto bail;
                         }
-                        rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR);
-                        if (rc < 0) {
-                                medusa_errorf("websocketclient_set_state failed, rc: %d", rc);
-                                error = rc;
-                                goto bail;
-                        }
                         goto out;
                 }
         }
         if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ) {
                 if (websocketclient->state == MEDUSA_WEBSOCKETCLIENT_STATE_REQUEST_SENT) {
-                        rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_RECEIVING_RESPONSE, NULL);
+                        rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_RECEIVING_RESPONSE, 0, __LINE__);
                         if (rc < 0) {
                                 error = rc;
                                 goto bail;
                         }
-                        rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_RECEIVING_RESPONSE);
+                        rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_RECEIVING_RESPONSE, NULL);
                         if (rc < 0) {
                                 error = rc;
                                 goto bail;
@@ -506,19 +507,18 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
                         if (websocketclient->sec_websocket_accept == NULL ||
                             strcasecmp(base64, websocketclient->sec_websocket_accept) != 0) {
                                 struct medusa_websocketclient_event_error medusa_websocketclient_event_error;
-                                websocketclient->error = EPERM;
+                                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR, EPERM, __LINE__);
+                                if (rc < 0) {
+                                        medusa_errorf("websocketclient_set_state failed, rc: %d", rc);
+                                        error = rc;
+                                        goto bail;
+                                }
                                 medusa_websocketclient_event_error.state  = websocketclient->state;
                                 medusa_websocketclient_event_error.error  = websocketclient->error;
                                 medusa_websocketclient_event_error.line   = __LINE__;
                                 medusa_websocketclient_event_error.reason = MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_INTERNAL;
                                 rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_ERROR, &medusa_websocketclient_event_error);
                                 if (rc < 0) {
-                                        error = rc;
-                                        goto bail;
-                                }
-                                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR);
-                                if (rc < 0) {
-                                        medusa_errorf("websocketclient_set_state failed, rc: %d", rc);
                                         error = rc;
                                         goto bail;
                                 }
@@ -529,12 +529,12 @@ static int websocketclient_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket
                         free(base64);
                         free(str);
 
-                        rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_CONNECTED, NULL);
+                        rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_CONNECTED, 0, __LINE__);
                         if (rc < 0) {
                                 error = rc;
                                 goto bail;
                         }
-                        rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_CONNECTED);
+                        rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_CONNECTED, NULL);
                         if (rc < 0) {
                                 error = rc;
                                 goto bail;
@@ -712,12 +712,12 @@ restart_buffer:
                                         }
 
                                         if (opcode == WS_OPCODE_CLOSE) {
-                                                rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_DISCONNECTED, NULL);
+                                                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_DISCONNECTED, 0, __LINE__);
                                                 if (rc < 0) {
                                                         error = rc;
                                                         goto bail;
                                                 }
-                                                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_DISCONNECTED);
+                                                rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_DISCONNECTED, NULL);
                                                 if (rc < 0) {
                                                         error = rc;
                                                         goto bail;
@@ -750,12 +750,12 @@ short_buffer:
         }
         if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE_FINISHED) {
                 if (websocketclient->state == MEDUSA_WEBSOCKETCLIENT_STATE_SENDING_REQUEST) {
-                        rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_REQUEST_SENT, NULL);
+                        rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_REQUEST_SENT, 0, __LINE__);
                         if (rc < 0) {
                                 error = rc;
                                 goto bail;
                         }
-                        rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_REQUEST_SENT);
+                        rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_REQUEST_SENT, NULL);
                         if (rc < 0) {
                                 error = rc;
                                 goto bail;
@@ -784,20 +784,19 @@ short_buffer:
         if (events & MEDUSA_TCPSOCKET_EVENT_ERROR) {
                 struct medusa_tcpsocket_event_error *medusa_tcpsocket_event_error = (struct medusa_tcpsocket_event_error *) param;
                 struct medusa_websocketclient_event_error medusa_websocketclient_event_error;
+                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR, EIO, __LINE__);
+                if (rc < 0) {
+                        error = rc;
+                        goto bail;
+                }
                 medusa_websocketclient_event_error.state  = websocketclient->state;
-                medusa_websocketclient_event_error.error  = EIO;
+                medusa_websocketclient_event_error.error  = websocketclient->error;
                 medusa_websocketclient_event_error.line   = __LINE__;
                 medusa_websocketclient_event_error.reason = MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_TCPSOCKET;
                 medusa_websocketclient_event_error.u.tcpsocket.state = medusa_tcpsocket_event_error->state;
                 medusa_websocketclient_event_error.u.tcpsocket.error = medusa_tcpsocket_event_error->error;
                 medusa_websocketclient_event_error.u.tcpsocket.line  = medusa_tcpsocket_event_error->line;
-                websocketclient->error = medusa_tcpsocket_event_error->error;
                 rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_ERROR, &medusa_websocketclient_event_error);
-                if (rc < 0) {
-                        error = rc;
-                        goto bail;
-                }
-                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR);
                 if (rc < 0) {
                         error = rc;
                         goto bail;
@@ -805,12 +804,12 @@ short_buffer:
                 medusa_websocketclient_destroy_unlocked(websocketclient);
         }
         if (events & MEDUSA_TCPSOCKET_EVENT_DISCONNECTED) {
-                rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_DISCONNECTED, NULL);
+                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_DISCONNECTED, 0, __LINE__);
                 if (rc < 0) {
                         error = rc;
                         goto bail;
                 }
-                rc = websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_DISCONNECTED);
+                rc = medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_DISCONNECTED, NULL);
                 if (rc < 0) {
                         error = rc;
                         goto bail;
@@ -820,9 +819,8 @@ short_buffer:
 
 out:    medusa_monitor_unlock(monitor);
         return 0;
-bail:   websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR);
-        websocketclient->error = -error;
-        struct medusa_websocketclient_event_error medusa_websocketclient_event_error;
+bail:   struct medusa_websocketclient_event_error medusa_websocketclient_event_error;
+        websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR, -error, __LINE__);
         medusa_websocketclient_event_error.state  = websocketclient->state;
         medusa_websocketclient_event_error.error  = websocketclient->error;
         medusa_websocketclient_event_error.line   = __LINE__;
@@ -909,7 +907,7 @@ __attribute__ ((visibility ("default"))) struct medusa_websocketclient * medusa_
         }
         memset(websocketclient, 0, sizeof(struct medusa_websocketclient));
         medusa_subject_set_type(&websocketclient->subject, MEDUSA_SUBJECT_TYPE_WEBSOCKETCLIENT);
-        websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_DISCONNECTED);
+        websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_DISCONNECTED, 0, __LINE__);
         websocketclient_set_flag(websocketclient, MEDUSA_WEBSOCKETCLIENT_FLAG_NONE);
         if (options->server_path != NULL) {
                 websocketclient->sec_websocket_path = strdup(options->server_path);
@@ -981,9 +979,8 @@ __attribute__ ((visibility ("default"))) struct medusa_websocketclient * medusa_
 bail:   if (MEDUSA_IS_ERR_OR_NULL(websocketclient)) {
                 return MEDUSA_ERR_PTR(error);
         }
-        websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR);
-        websocketclient->error = -error;
         struct medusa_websocketclient_event_error medusa_websocketclient_event_error;
+        websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR, -error, __LINE__);
         medusa_websocketclient_event_error.state  = websocketclient->state;
         medusa_websocketclient_event_error.error  = websocketclient->error;
         medusa_websocketclient_event_error.line   = __LINE__;
@@ -1212,9 +1209,8 @@ __attribute__ ((visibility ("default"))) int64_t medusa_websocketclient_write_un
         }
 
         return length;
-bail:   websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR);
-        websocketclient->error = -error;
-        struct medusa_websocketclient_event_error medusa_websocketclient_event_error;
+bail:   struct medusa_websocketclient_event_error medusa_websocketclient_event_error;
+        websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR, -error, __LINE__);
         medusa_websocketclient_event_error.state  = websocketclient->state;
         medusa_websocketclient_event_error.error  = websocketclient->error;
         medusa_websocketclient_event_error.line   = __LINE__;

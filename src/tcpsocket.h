@@ -181,6 +181,11 @@ struct medusa_tcpsocket_attach_options {
         int enabled;
 };
 
+struct medusa_tcpsocket_event_buffered_read {
+        int64_t length;
+        int64_t remaining;
+};
+
 struct medusa_tcpsocket_event_buffered_write {
         int64_t length;
         int64_t remaining;

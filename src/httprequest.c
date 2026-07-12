@@ -429,15 +429,15 @@ static int httprequest_httpparser_on_headers_complete (http_parser *http_parser)
         struct medusa_httprequest *httprequest = http_parser->data;
         if (httprequest->method != NULL &&
             strcasecmp(httprequest->method, "head") == 0) {
-                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED, NULL);
-                if (rc < 0) {
-                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                        httprequest->onevent_error = rc;
-                        return rc;
-                }
                 rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_RECEIVED);
                 if (rc < 0) {
                         medusa_errorf("httprequest_set_state failed, rc: %d", rc);
+                        httprequest->onevent_error = rc;
+                        return rc;
+                }
+                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED, NULL);
+                if (rc < 0) {
+                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                         httprequest->onevent_error = rc;
                         return rc;
                 }
@@ -471,15 +471,15 @@ static int httprequest_httpparser_on_message_complete (http_parser *http_parser)
 {
         int rc;
         struct medusa_httprequest *httprequest = http_parser->data;
-        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED, NULL);
-        if (rc < 0) {
-                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                httprequest->onevent_error = rc;
-                return rc;
-        }
         rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_RECEIVED);
         if (rc < 0) {
                 medusa_errorf("httprequest_set_state failed, rc: %d", rc);
+                httprequest->onevent_error = rc;
+                return rc;
+        }
+        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED, NULL);
+        if (rc < 0) {
+                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                 httprequest->onevent_error = rc;
                 return rc;
         }
@@ -518,62 +518,62 @@ static int httprequest_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket, un
         medusa_monitor_lock(monitor);
 
         if (events & MEDUSA_TCPSOCKET_EVENT_RESOLVING) {
-                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RESOLVING, NULL);
-                if (rc < 0) {
-                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                        goto bail;
-                }
                 rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_RESOLVING);
                 if (rc < 0) {
                         medusa_errorf("httprequest_set_state failed, rc: %d", rc);
                         goto bail;
                 }
-        }
-        if (events & MEDUSA_TCPSOCKET_EVENT_RESOLVED) {
-                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RESOLVED, NULL);
+                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RESOLVING, NULL);
                 if (rc < 0) {
                         medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                         goto bail;
                 }
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_RESOLVED) {
                 rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_RESOLVED);
                 if (rc < 0) {
                         medusa_errorf("httprequest_set_state failed, rc: %d", rc);
                         goto bail;
                 }
-        }
-        if (events & MEDUSA_TCPSOCKET_EVENT_RESOLVE_TIMEOUT) {
-                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RESOLVE_TIMEOUT, NULL);
+                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RESOLVED, NULL);
                 if (rc < 0) {
                         medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                         goto bail;
                 }
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_RESOLVE_TIMEOUT) {
                 rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_DISCONNECTED);
                 if (rc < 0) {
                         medusa_errorf("httprequest_set_state failed, rc: %d", rc);
                         goto bail;
                 }
-        }
-        if (events & MEDUSA_TCPSOCKET_EVENT_CONNECTING) {
-                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_CONNECTING, NULL);
+                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RESOLVE_TIMEOUT, NULL);
                 if (rc < 0) {
                         medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                         goto bail;
                 }
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_CONNECTING) {
                 rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_CONNECTING);
                 if (rc < 0) {
                         medusa_errorf("httprequest_set_state failed, rc: %d", rc);
                         goto bail;
                 }
-        }
-        if (events & MEDUSA_TCPSOCKET_EVENT_CONNECTED) {
-                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_CONNECTED, NULL);
+                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_CONNECTING, NULL);
                 if (rc < 0) {
                         medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                         goto bail;
                 }
+        }
+        if (events & MEDUSA_TCPSOCKET_EVENT_CONNECTED) {
                 rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_CONNECTED);
                 if (rc < 0) {
                         medusa_errorf("httprequest_set_state failed, rc: %d", rc);
+                        goto bail;
+                }
+                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_CONNECTED, NULL);
+                if (rc < 0) {
+                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                         goto bail;
                 }
                 http_parser_settings_init(&httprequest->http_parser_settings);
@@ -591,55 +591,55 @@ static int httprequest_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket, un
                 httprequest->http_parser.data = httprequest;
         }
         if (events & MEDUSA_TCPSOCKET_EVENT_CONNECT_TIMEOUT) {
-                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_CONNECT_TIMEOUT, NULL);
-                if (rc < 0) {
-                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                        goto bail;
-                }
                 rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_DISCONNECTED);
                 if (rc < 0) {
                         medusa_errorf("httprequest_set_state failed, rc: %d", rc);
                         goto bail;
                 }
+                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_CONNECT_TIMEOUT, NULL);
+                if (rc < 0) {
+                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
+                        goto bail;
+                }
         }
         if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE) {
                 if (httprequest_get_state(httprequest) == MEDUSA_HTTPREQUEST_STATE_CONNECTED) {
-                        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_REQUESTING, NULL);
-                        if (rc < 0) {
-                                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                                goto bail;
-                        }
                         rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_REQUESTING);
                         if (rc < 0) {
                                 medusa_errorf("httprequest_set_state failed, rc: %d", rc);
+                                goto bail;
+                        }
+                        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_REQUESTING, NULL);
+                        if (rc < 0) {
+                                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                                 goto bail;
                         }
                 }
         }
         if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_WRITE_FINISHED) {
                 if (httprequest_get_state(httprequest) == MEDUSA_HTTPREQUEST_STATE_REQUESTING) {
-                        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_REQUESTED, NULL);
-                        if (rc < 0) {
-                                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                                goto bail;
-                        }
                         rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_REQUESTED);
                         if (rc < 0) {
                                 medusa_errorf("httprequest_set_state failed, rc: %d", rc);
+                                goto bail;
+                        }
+                        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_REQUESTED, NULL);
+                        if (rc < 0) {
+                                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                                 goto bail;
                         }
                 }
         }
         if (events & MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ) {
                 if (httprequest_get_state(httprequest) == MEDUSA_HTTPREQUEST_STATE_REQUESTED) {
-                        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVING, NULL);
-                        if (rc < 0) {
-                                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                                goto bail;
-                        }
                         rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_RECEIVING);
                         if (rc < 0) {
                                 medusa_errorf("httprequest_set_state failed, rc: %d", rc);
+                                goto bail;
+                        }
+                        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVING, NULL);
+                        if (rc < 0) {
+                                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                                 goto bail;
                         }
                 }
@@ -682,14 +682,14 @@ static int httprequest_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket, un
                                 medusa_httprequest_event_error.line   = __LINE__;
                                 medusa_httprequest_event_error.reason = MEDUSA_HTTPREQUEST_ERROR_REASON_PARSER;
                                 medusa_httprequest_event_error.u.parser.error = httprequest->http_parser.http_errno;
-                                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_ERROR, &medusa_httprequest_event_error);
-                                if (rc < 0) {
-                                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                                        goto bail;
-                                }
                                 rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_DISCONNECTED);
                                 if (rc < 0) {
                                         medusa_errorf("httprequest_set_state failed, rc: %d", rc);
+                                        goto bail;
+                                }
+                                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_ERROR, &medusa_httprequest_event_error);
+                                if (rc < 0) {
+                                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                                         goto bail;
                                 }
                                 break;
@@ -718,38 +718,38 @@ static int httprequest_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket, un
                 medusa_httprequest_event_error.u.tcpsocket.state = medusa_tcpsocket_event_error->state;
                 medusa_httprequest_event_error.u.tcpsocket.error = medusa_tcpsocket_event_error->error;
                 medusa_httprequest_event_error.u.tcpsocket.line  = medusa_tcpsocket_event_error->line;
+                rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_DISCONNECTED);
+                if (rc < 0) {
+                        medusa_errorf("httprequest_set_state failed, rc: %d", rc);
+                        goto bail;
+                }
                 rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_ERROR, &medusa_httprequest_event_error);
                 if (rc < 0) {
                         medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                         goto bail;
                 }
-                rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_DISCONNECTED);
-                if (rc < 0) {
-                        medusa_errorf("httprequest_set_state failed, rc: %d", rc);
-                        goto bail;
-                }
         }
         if (events & MEDUSA_TCPSOCKET_EVENT_DISCONNECTED) {
                 if (httprequest_get_state(httprequest) == MEDUSA_HTTPREQUEST_STATE_RECEIVING) {
-                        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED, NULL);
-                        if (rc < 0) {
-                                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                                goto bail;
-                        }
                         rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_RECEIVED);
                         if (rc < 0) {
                                 medusa_errorf("httprequest_set_state failed, rc: %d", rc);
                                 goto bail;
                         }
-                }
-                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED, NULL);
-                if (rc < 0) {
-                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                        goto bail;
+                        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED, NULL);
+                        if (rc < 0) {
+                                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
+                                goto bail;
+                        }
                 }
                 rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_DISCONNECTED);
                 if (rc < 0) {
                         medusa_errorf("httprequest_set_state failed, rc: %d", rc);
+                        goto bail;
+                }
+                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED, NULL);
+                if (rc < 0) {
+                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
                         goto bail;
                 }
         }
@@ -1706,8 +1706,8 @@ __attribute__ ((visibility ("default"))) int medusa_httprequest_make_request_unl
         medusa_url_destroy(url);
         return 0;
 bail:   medusa_url_destroy(url);
-        medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED, NULL);
         httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_DISCONNECTED);
+        medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED, NULL);
         return ret;
 }
 
