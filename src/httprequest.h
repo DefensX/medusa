@@ -33,7 +33,8 @@ enum {
         MEDUSA_HTTPREQUEST_EVENT_RECEIVED               = (1 << 11), /* 0x00000800 */
         MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED           = (1 << 12), /* 0x00001000 */
         MEDUSA_HTTPREQUEST_EVENT_ERROR                  = (1 << 13), /* 0x00002000 */
-        MEDUSA_HTTPREQUEST_EVENT_DESTROY                = (1 << 14), /* 0x00004000 */
+        MEDUSA_HTTPREQUEST_STATE_CHANGED                = (1 << 14), /* 0x00004000 */
+        MEDUSA_HTTPREQUEST_EVENT_DESTROY                = (1 << 15), /* 0x00008000 */
 #define MEDUSA_HTTPREQUEST_EVENT_RESOLVING              MEDUSA_HTTPREQUEST_EVENT_RESOLVING
 #define MEDUSA_HTTPREQUEST_EVENT_RESOLVE_TIMEOUT        MEDUSA_HTTPREQUEST_EVENT_RESOLVE_TIMEOUT
 #define MEDUSA_HTTPREQUEST_EVENT_RESOLVED               MEDUSA_HTTPREQUEST_EVENT_RESOLVED
@@ -48,6 +49,7 @@ enum {
 #define MEDUSA_HTTPREQUEST_EVENT_RECEIVED               MEDUSA_HTTPREQUEST_EVENT_RECEIVED
 #define MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED           MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED
 #define MEDUSA_HTTPREQUEST_EVENT_ERROR                  MEDUSA_HTTPREQUEST_EVENT_ERROR
+#define MEDUSA_HTTPREQUEST_STATE_CHANGED                MEDUSA_HTTPREQUEST_STATE_CHANGED
 #define MEDUSA_HTTPREQUEST_EVENT_DESTROY                MEDUSA_HTTPREQUEST_EVENT_DESTROY
 };
 
@@ -109,6 +111,11 @@ struct medusa_httprequest_event_error {
                         unsigned int error;
                 } parser;
         } u;
+};
+
+struct medusa_httprequest_event_state_changed {
+        unsigned int pstate;
+        unsigned int state;
 };
 
 #ifdef __cplusplus
