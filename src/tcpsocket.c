@@ -1402,6 +1402,8 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                         }
                                         if (!medusa_tcpsocket_get_ssl_unlocked(tcpsocket)) {
                                                 break;
+                                        } else if (tcpsocket->ssl_wantread  == 0 && tcpsocket->ssl_wantwrite == 0) {
+                                                break;
                                         }
                                 }
                         }
