@@ -910,8 +910,14 @@ __attribute__ ((visibility ("default"))) struct medusa_httprequest * medusa_http
         memset(httprequest, 0, sizeof(struct medusa_httprequest));
         rc = httprequest_init_with_options_unlocked(httprequest, options);
         if (rc < 0) {
-                medusa_httprequest_destroy_unlocked(httprequest);
-                return MEDUSA_ERR_PTR(rc);
+                struct medusa_httprequest_event_error medusa_httprequest_event_error;
+                medusa_httprequest_event_error.state  = httprequest->state;
+                medusa_httprequest_event_error.error  = -rc;
+                medusa_httprequest_event_error.line   = __LINE__;
+                medusa_httprequest_event_error.reason = MEDUSA_HTTPREQUEST_ERROR_REASON_PARSER;
+                medusa_httprequest_event_error.u.parser.error = httprequest->http_parser.http_errno;
+                httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_DISCONNECTED);
+                medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_ERROR, &medusa_httprequest_event_error);
         }
         return httprequest;
 }
