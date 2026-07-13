@@ -1363,6 +1363,7 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                 }
                                                 break;
                                         } else {
+                                                struct medusa_tcpsocket_event_buffered_read medusa_tcpsocket_event_buffered_read;
                                                 iovec.iov_len = rlength;
                                                 clength = medusa_buffer_commitv(tcpsocket->rbuffer, &iovec, 1);
                                                 if (clength < 0) {
@@ -1388,10 +1389,12 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                         rc = medusa_timer_restart_unlocked(tcpsocket->rtimer);
                                                         if (rc < 0) {
                                                                 medusa_errorf("medusa_timer_restart_unlocked failed, rc: %d", rc);
-                                                                return rc;
+                                                                goto bail;
                                                         }
                                                 }
-                                                rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ, NULL);
+                                                medusa_tcpsocket_event_buffered_read.length    = rlength;
+                                                medusa_tcpsocket_event_buffered_read.remaining = medusa_buffer_get_length(tcpsocket->rbuffer);
+                                                rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ, &medusa_tcpsocket_event_buffered_read);
                                                 if (rc < 0) {
                                                         medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
                                                         goto bail;
@@ -3453,7 +3456,10 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_enabled_unlock
         if (enabled) {
                 if (medusa_tcpsocket_get_buffered_unlocked(tcpsocket) > 0 &&
                     medusa_buffer_get_length(tcpsocket->rbuffer) > 0) {
-                        rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ, NULL);
+                        struct medusa_tcpsocket_event_buffered_read medusa_tcpsocket_event_buffered_read;
+                        medusa_tcpsocket_event_buffered_read.length    = 0;
+                        medusa_tcpsocket_event_buffered_read.remaining = medusa_buffer_get_length(tcpsocket->rbuffer);
+                        rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_BUFFERED_READ, &medusa_tcpsocket_event_buffered_read);
                         if (rc < 0) {
                                 return rc;
                         }
