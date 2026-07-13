@@ -686,8 +686,12 @@ static struct medusa_udpsocket * udpsocket_create_unlocked (struct medusa_monito
         memset(udpsocket, 0, sizeof(struct medusa_udpsocket));
         rc = udpsocket_init_unlocked(udpsocket, monitor, onevent, context);
         if (rc < 0) {
-                medusa_udpsocket_destroy_unlocked(udpsocket);
-                return MEDUSA_ERR_PTR(rc);
+                struct medusa_udpsocket_event_error medusa_udpsocket_event_error;
+                medusa_udpsocket_event_error.state = udpsocket->state;
+                medusa_udpsocket_event_error.error = -rc;
+                medusa_udpsocket_event_error.line  = __LINE__;
+                udpsocket_set_state(udpsocket, MEDUSA_UDPSOCKET_STATE_ERROR, medusa_udpsocket_event_error.error);
+                medusa_udpsocket_onevent_unlocked(udpsocket, MEDUSA_UDPSOCKET_EVENT_ERROR, &medusa_udpsocket_event_error);
         }
         return udpsocket;
 }
@@ -961,8 +965,7 @@ bail:   if (MEDUSA_IS_ERR_OR_NULL(udpsocket)) {
                 udpsocket_set_state(udpsocket, MEDUSA_UDPSOCKET_STATE_ERROR, medusa_udpsocket_event_error.error);
                 medusa_udpsocket_onevent_unlocked(udpsocket, MEDUSA_UDPSOCKET_EVENT_ERROR, &medusa_udpsocket_event_error);
         }
-        medusa_udpsocket_destroy_unlocked(udpsocket);
-        return MEDUSA_ERR_PTR(ret);
+        return udpsocket;
 }
 
 __attribute__ ((visibility ("default"))) struct medusa_udpsocket * medusa_udpsocket_bind_with_options (const struct medusa_udpsocket_bind_options *options)
@@ -1107,8 +1110,7 @@ bail:   if (result != NULL) {
                 udpsocket_set_state(udpsocket, MEDUSA_UDPSOCKET_STATE_ERROR, medusa_udpsocket_event_error.error);
                 medusa_udpsocket_onevent_unlocked(udpsocket, MEDUSA_UDPSOCKET_EVENT_ERROR, &medusa_udpsocket_event_error);
         }
-        medusa_udpsocket_destroy_unlocked(udpsocket);
-        return MEDUSA_ERR_PTR(ret);
+        return udpsocket;
 }
 
 __attribute__ ((visibility ("default"))) struct medusa_udpsocket * medusa_udpsocket_open_with_options (const struct medusa_udpsocket_open_options *options)
@@ -1953,8 +1955,7 @@ bail:   if (udpsocket_addrinfo != NULL) {
                 udpsocket_set_state(udpsocket, MEDUSA_UDPSOCKET_STATE_ERROR, medusa_udpsocket_event_error.error);
                 medusa_udpsocket_onevent_unlocked(udpsocket, MEDUSA_UDPSOCKET_EVENT_ERROR, &medusa_udpsocket_event_error);
         }
-        medusa_udpsocket_destroy_unlocked(udpsocket);
-        return MEDUSA_ERR_PTR(ret);
+        return udpsocket;
 }
 
 __attribute__ ((visibility ("default"))) struct medusa_udpsocket * medusa_udpsocket_connect_with_options (const struct medusa_udpsocket_connect_options *options)
@@ -2132,8 +2133,7 @@ bail:   if (MEDUSA_IS_ERR_OR_NULL(udpsocket)) {
                 udpsocket_set_state(udpsocket, MEDUSA_UDPSOCKET_STATE_ERROR, medusa_udpsocket_event_error.error);
                 medusa_udpsocket_onevent_unlocked(udpsocket, MEDUSA_UDPSOCKET_EVENT_ERROR, &medusa_udpsocket_event_error);
         }
-        medusa_udpsocket_destroy_unlocked(udpsocket);
-        return MEDUSA_ERR_PTR(ret);
+        return udpsocket;
 }
 
 __attribute__ ((visibility ("default"))) struct medusa_udpsocket * medusa_udpsocket_attach_with_options (const struct medusa_udpsocket_attach_options *options)
