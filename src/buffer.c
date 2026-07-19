@@ -608,6 +608,48 @@ __attribute__ ((visibility ("default"))) int medusa_buffer_shrink (struct medusa
         return buffer->backend->shrink(buffer, size);
 }
 
+__attribute__ ((visibility ("default"))) int medusa_buffer_maybe_shrink (struct medusa_buffer *b, int64_t min, int64_t max)
+{
+        int rc;
+
+        int64_t target;
+        int64_t s = medusa_buffer_get_size(b);   /* allocated capacity */
+        int64_t l = medusa_buffer_get_length(b); /* bytes in use       */
+
+        if (s < 0) {
+                medra_errorf("invalid buffer size: %d", (int) s);
+                goto bail;
+        }
+        if (l < 0) {
+                medra_errorf("invalid buffer length: %d", (int) l);
+                goto bail;
+        }
+
+        /* keep the data plus 50% headroom, clamped to [min, max] ... */
+        target = l + l / 2;
+        if (target < min)
+                target = min;
+        if (target > max)
+                target = max;
+        /* ... but never below what is needed to hold the current data */
+        if (target < l)
+                target = l;
+
+        /* only shrink when clearly over-allocated (hysteresis vs. re-grow) */
+        if (s <= target * 2) {
+                goto out;
+        }
+
+        rc = medusa_buffer_shrink(b, target);
+        if (rc < 0) {
+                medra_errorf("can not shrink buffer");
+                goto bail;
+        }
+
+out:    return 0;
+bail:   return -1;
+}
+
 __attribute__ ((visibility ("default"))) int medusa_buffer_memcmp (const struct medusa_buffer *buffer, int64_t offset, const void *data, int64_t length)
 {
         int ret;
