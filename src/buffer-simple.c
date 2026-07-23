@@ -132,50 +132,6 @@ static int64_t simple_buffer_insertv (struct medusa_buffer *buffer, int64_t offs
         return length;
 }
 
-static int64_t simple_buffer_insertfv (struct medusa_buffer *buffer, int64_t offset, const char *format, va_list va)
-{
-        int rc;
-        int length;
-        va_list vs;
-        struct medusa_buffer_simple *simple = (struct medusa_buffer_simple *) buffer;
-        if (MEDUSA_IS_ERR_OR_NULL(simple)) {
-                return -EINVAL;
-        }
-        if (offset < 0) {
-                offset = simple->length + offset;
-        }
-        if (offset < 0) {
-                return -EINVAL;
-        }
-        if (offset > simple->length) {
-                return -EINVAL;
-        }
-        va_copy(vs, va);
-        length = vsnprintf(NULL, 0, format, vs);
-        va_end(vs);
-        if (length < 0) {
-                return -EIO;
-        }
-        length += 1;
-        if (simple->size < simple->length + length) {
-                rc = simple_buffer_resize(simple, simple->length + length);
-                if (rc < 0) {
-                        return rc;
-                }
-        }
-        if (offset != simple->length) {
-                memmove(simple->data + offset + length, simple->data + offset, simple->length - offset);
-        }
-        va_copy(vs, va);
-        rc = vsnprintf(simple->data + offset, length, format, vs);
-        va_end(vs);
-        if (rc < 0) {
-                return -EIO;
-        }
-        simple->length += rc;
-        return rc;
-}
-
 static int64_t simple_buffer_reservev (struct medusa_buffer *buffer, int64_t length, struct medusa_iovec *iovecs, int64_t niovecs)
 {
         int rc;
@@ -371,7 +327,6 @@ const struct medusa_buffer_backend simple_buffer_backend = {
         .get_length     = simple_buffer_get_length,
 
         .insertv        = simple_buffer_insertv,
-        .insertfv       = simple_buffer_insertfv,
 
         .reservev       = simple_buffer_reservev,
         .commitv        = simple_buffer_commitv,

@@ -127,8 +127,6 @@ static int64_t ring_buffer_insertv (struct medusa_buffer *buffer, int64_t offset
         int64_t src;
         int64_t dst;
 
-        int64_t srcbeg;
-        int64_t srcend;
         int64_t dstbeg;
         int64_t dstend;
 
@@ -179,65 +177,39 @@ static int64_t ring_buffer_insertv (struct medusa_buffer *buffer, int64_t offset
                         ring->head += ring->size;
                 }
         } else if (offset != ring->length) {
-                srcbeg = ring->head + offset;
-                srcend = ring->head + ring->length;
-                dstbeg = srcbeg + length;
-                dstend = srcend + length;
-
                 /*
-                 *  H      SrcBeg      DstBeg      SrcEnd      DstEnd
-                 *  |         |           |           |           |
-                 *  |         *************************           |
-                 *  |                     |                       |
-                 *  |                     +++++++++++++++++++++++++
-                 *  ------------------------------------------------------
-                 *      S1         S2          S3          S4           S5
+                 * shift the tail [offset, ring->length) up by `length` to
+                 * make room for the new data, one physically contiguous run
+                 * at a time, walking backward from the end of the tail:
+                 * both the source and destination windows may individually
+                 * wrap the end of the physical allocation, at different
+                 * points from one another, and since the destination is
+                 * ahead of the source (we are making the data larger) the
+                 * copy has to proceed back-to-front, exactly like memmove()
+                 * itself would for a single overlapping range, or an
+                 * earlier chunk's write can clobber a later chunk's read.
                  */
-                if (srcbeg >= ring->size) {
-                        len = srcend - srcbeg;
-                        src = srcbeg - ring->size;
-                        dst = dstbeg - ring->size;
-                        memmove(ring->data + dst, ring->data + src, len);
-                } else if (dstbeg >= ring->size) {
-                        len = srcend - ring->size;
-                        src = 0;
-                        dst = length;
-                        memmove(ring->data + dst, ring->data + src, len);
+                int64_t remaining;
+                int64_t srccur;
+                int64_t dstcur;
 
-                        len = ring->size - srcbeg;
-                        src = srcbeg;
-                        dst = dstbeg - ring->size;
-                        memmove(ring->data + dst, ring->data + src, len);
-                } else if (srcend > ring->size) {
-                        len = srcend - ring->size;
-                        src = 0;
-                        dst = src + length;
-                        memmove(ring->data + dst, ring->data + src, len);
-
-                        len = length;
-                        src = ring->size - len;
-                        dst = 0;
-                        memmove(ring->data + dst, ring->data + src, len);
-
-                        len = ring->size - dstbeg;
-                        src = srcbeg;
-                        dst = dstbeg;
-                        memmove(ring->data + dst, ring->data + src, len);
-                } else if (dstend > ring->size) {
-                        len = dstend - ring->size;
-                        src = srcend - len;
-                        dst = 0;
-                        memmove(ring->data + dst, ring->data + src, len);
-
-                        len = ring->size - (dstend - ring->size);
-                        src = srcbeg;
-                        dst = dstbeg;
-                        memmove(ring->data + dst, ring->data + src, len);
-                } else {
-                        len = srcend - srcbeg;
-                        src = srcbeg;
-                        dst = dstbeg;
-                        memmove(ring->data + dst, ring->data + src, len);
+                remaining = ring->length - offset;
+                srccur = ring->head + ring->length;
+                dstcur = srccur + length;
+                while (remaining > 0) {
+                        int64_t run = remaining;
+                        int64_t d1 = ((srccur - 1) % ring->size) + 1;
+                        int64_t d2 = ((dstcur - 1) % ring->size) + 1;
+                        if (d1 < run) {
+                                run = d1;
+                        }
+                        if (d2 < run) {
+                                run = d2;
+                        }
+                        srccur -= run;
+                        dstcur -= run;
+                        memmove(ring->data + (dstcur % ring->size), ring->data + (srccur % ring->size), run);
+                        remaining -= run;
                 }
         }
 
@@ -278,139 +250,6 @@ static int64_t ring_buffer_insertv (struct medusa_buffer *buffer, int64_t offset
 
         ring->length += length;
         return length;
-}
-
-static int64_t ring_buffer_insertfv (struct medusa_buffer *buffer, int64_t offset, const char *format, va_list va)
-{
-        int rc;
-        va_list vs;
-
-        int length;
-
-        int64_t len;
-        int64_t src;
-        int64_t dst;
-
-        int64_t srcbeg;
-        int64_t srcend;
-        int64_t dstbeg;
-        int64_t dstend;
-
-        struct medusa_buffer_ring *ring = (struct medusa_buffer_ring *) buffer;
-
-        if (MEDUSA_IS_ERR_OR_NULL(ring)) {
-                return -EINVAL;
-        }
-
-        if (offset < 0) {
-                offset = ring->length + offset;
-        }
-        if (offset < 0) {
-                return -EINVAL;
-        }
-        if (offset > ring->length) {
-                return -EINVAL;
-        }
-
-        va_copy(vs, va);
-        length = vsnprintf(NULL, 0, format, vs);
-        va_end(vs);
-        if (length < 0) {
-                return -EIO;
-        }
-        length += 1;
-
-        if (ring->size < ring->length + length) {
-                rc = ring_buffer_resize(ring, ring->length + length);
-                if (rc < 0) {
-                        return rc;
-                }
-        }
-
-again:
-        if (offset == 0 &&
-            ring->head >= length) {
-                ring->head = ring->head - length;
-                if (ring->head < 0) {
-                        ring->head += ring->size;
-                }
-        } else if (offset != ring->length) {
-                srcbeg = ring->head + offset;
-                srcend = ring->head + ring->length;
-                dstbeg = srcbeg + length;
-                dstend = srcend + length;
-
-                /*
-                 *  H      SrcBeg      DstBeg      SrcEnd      DstEnd
-                 *  |         |           |           |           |
-                 *  |         *************************           |
-                 *  |                     |                       |
-                 *  |                     +++++++++++++++++++++++++
-                 *  ------------------------------------------------------
-                 *      S1         S2          S3          S4           S5
-                 */
-                if (srcbeg >= ring->size) {
-                        len = srcend - srcbeg;
-                        src = srcbeg - ring->size;
-                        dst = dstbeg - ring->size;
-                        memmove(ring->data + dst, ring->data + src, len);
-                } else if (dstbeg > ring->size) {
-                        rc = ring_buffer_headify(ring);
-                        if (rc < 0) {
-                                return -EIO;
-                        }
-                        goto again;
-                } else if (srcend > ring->size) {
-                        len = srcend - ring->size;
-                        src = 0;
-                        dst = src + length;
-                        memmove(ring->data + dst, ring->data + src, len);
-
-                        len = length;
-                        src = ring->size - len;
-                        dst = 0;
-                        memmove(ring->data + dst, ring->data + src, len);
-
-                        len = ring->size - dstbeg;
-                        src = srcbeg;
-                        dst = dstbeg;
-                        memmove(ring->data + dst, ring->data + src, len);
-                } else if (dstend > ring->size) {
-                        len = dstend - ring->size;
-                        src = srcend - len;
-                        dst = 0;
-                        memmove(ring->data + dst, ring->data + src, len);
-
-                        len = ring->size - (dstend - ring->size);
-                        src = srcbeg;
-                        dst = dstbeg;
-                        memmove(ring->data + dst, ring->data + src, len);
-                } else {
-                        len = srcend - srcbeg;
-                        src = srcbeg;
-                        dst = dstbeg;
-                        memmove(ring->data + dst, ring->data + src, len);
-                }
-        } else if (offset == ring->length &&
-                   ring->head + offset + length > ring->size) {
-                rc = ring_buffer_headify(ring);
-                if (rc < 0) {
-                        return -EIO;
-                }
-                goto again;
-        }
-
-        len = length;
-        dst = (ring->head + offset) % ring->size;
-
-        va_copy(vs, va);
-        rc = vsnprintf(ring->data + dst, len, format, vs);
-        va_end(vs);
-        if (rc < 0) {
-                return -EIO;
-        }
-        ring->length += rc;
-        return rc;
 }
 
 static int64_t ring_buffer_reservev (struct medusa_buffer *buffer, int64_t length, struct medusa_iovec *iovecs, int64_t niovecs)
@@ -597,14 +436,9 @@ static int64_t ring_buffer_peekv (const struct medusa_buffer *buffer, int64_t of
 
 static int64_t ring_buffer_choke (struct medusa_buffer *buffer, int64_t offset, int64_t length)
 {
-        int64_t len;
-        int64_t src;
-        int64_t dst;
-
-        int64_t srcbeg;
-        int64_t srcend;
-        int64_t dstbeg;
-        int64_t dstend;
+        int64_t remaining;
+        int64_t srcpos;
+        int64_t dstpos;
 
         struct medusa_buffer_ring *ring = (struct medusa_buffer_ring *) buffer;
 
@@ -642,70 +476,36 @@ static int64_t ring_buffer_choke (struct medusa_buffer *buffer, int64_t offset, 
                 }
                 return length;
         }
-        if (ring->head + offset + length == ring->length) {
+        if (offset + length == ring->length) {
+                /* nothing after the choked window, nothing to shift */
                 ring->length -= length;
                 return length;
         }
 
-        srcbeg = ring->head + offset + length;
-        srcend = ring->head + ring->length;
-        dstbeg = srcbeg - length;
-        dstend = srcend - length;
-
         /*
-         *  H      DstBeg      SrcBeg      DstEnd      SrcEnd
-         *  |         |           |           |           |
-         *  |         *************************           |
-         *  |                     |                       |
-         *  |                     +++++++++++++++++++++++++
-         *  ------------------------------------------------------
-         *      S1         S2          S3          S4           S5
+         * shift the tail [offset+length, ring->length) down by `length` to
+         * close the gap left by the choked window, one physically
+         * contiguous run at a time: both the source and the destination
+         * windows may individually wrap the end of the physical
+         * allocation, and they wrap at different points from one another,
+         * so a single memmove (or a fixed handful of case-split memmoves)
+         * cannot be relied on to land on the correct byte ranges.
          */
-        if (dstbeg >= ring->size) {
-                len = srcend - srcbeg;
-                src = srcbeg - ring->size;
-                dst = dstbeg - ring->size;
-                memmove(ring->data + dst, ring->data + src, len);
-        } else if (srcbeg >= ring->size) {
-                len = ring->size - dstbeg;
-                src = srcbeg - ring->size;
-                dst = dstbeg;
-                memmove(ring->data + dst, ring->data + src, len);
-
-                len = dstend - ring->size;
-                src = srcend - len;
-                dst = 0;
-                memmove(ring->data + dst, ring->data + src, len);
-        } else if (dstend > ring->size) {
-                len = ring->size - srcbeg;
-                src = srcbeg;
-                dst = dstbeg;
-                memmove(ring->data + dst, ring->data + src, len);
-
-                len = length;
-                src = 0;
-                dst = ring->size - length;
-                memmove(ring->data + dst, ring->data + src, len);
-
-                len = srcend - ring->size - length;
-                src = length;
-                dst = 0;
-                memmove(ring->data + dst, ring->data + src, len);
-        } else if (dstend > ring->size) {
-                len = ring->size - srcbeg;
-                src = srcbeg;
-                dst = dstbeg;
-                memmove(ring->data + dst, ring->data + src, len);
-
-                len = srcend - ring->size;
-                src = 0;
-                dst = dstbeg + ring->size - srcbeg;
-                memmove(ring->data + dst, ring->data + src, len);
-        } else {
-                len = srcend - srcbeg;
-                src = srcbeg;
-                dst = dstbeg;
-                memmove(ring->data + dst, ring->data + src, len);
+        remaining = ring->length - (offset + length);
+        srcpos = (ring->head + offset + length) % ring->size;
+        dstpos = (ring->head + offset) % ring->size;
+        while (remaining > 0) {
+                int64_t run = remaining;
+                if (ring->size - srcpos < run) {
+                        run = ring->size - srcpos;
+                }
+                if (ring->size - dstpos < run) {
+                        run = ring->size - dstpos;
+                }
+                memmove(ring->data + dstpos, ring->data + srcpos, run);
+                srcpos = (srcpos + run) % ring->size;
+                dstpos = (dstpos + run) % ring->size;
+                remaining -= run;
         }
 
         ring->length -= length;
@@ -825,7 +625,6 @@ const struct medusa_buffer_backend ring_buffer_backend = {
         .get_length     = ring_buffer_get_length,
 
         .insertv        = ring_buffer_insertv,
-        .insertfv       = ring_buffer_insertfv,
 
         .reservev       = ring_buffer_reservev,
         .commitv        = ring_buffer_commitv,

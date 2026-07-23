@@ -245,30 +245,35 @@ __attribute__ ((visibility ("default"))) int64_t medusa_buffer_insertf (struct m
 __attribute__ ((visibility ("default"))) int64_t medusa_buffer_insertfv (struct medusa_buffer *buffer, int64_t offset, const char *format, va_list va)
 {
         int rc;
+        int length;
+        va_list vs;
         int64_t ret;
+        char *tmp;
         if (MEDUSA_IS_ERR_OR_NULL(buffer)) {
-                return -EINVAL;
-        }
-        if (MEDUSA_IS_ERR_OR_NULL(buffer->backend)) {
-                return -EINVAL;
-        }
-        if (MEDUSA_IS_ERR_OR_NULL(buffer->backend->insertfv)) {
                 return -EINVAL;
         }
         if (MEDUSA_IS_ERR_OR_NULL(format)) {
                 return -EINVAL;
         }
-        ret = buffer->backend->insertfv(buffer, offset, format, va);
-        if (ret < 0) {
-                return ret;
+        va_copy(vs, va);
+        length = vsnprintf(NULL, 0, format, vs);
+        va_end(vs);
+        if (length < 0) {
+                return -EIO;
         }
-        if (ret > 0) {
-                rc = buffer_onevent(buffer, MEDUSA_BUFFER_EVENT_WRITE, NULL);
-                if (rc != 0) {
-                        medusa_errorf("buffer_onevent failed, rc: %d", rc);
-                        return rc;
-                }
+        tmp = malloc(length + 1);
+        if (tmp == NULL) {
+                return -ENOMEM;
         }
+        va_copy(vs, va);
+        rc = vsnprintf(tmp, length + 1, format, vs);
+        va_end(vs);
+        if (rc < 0) {
+                free(tmp);
+                return -EIO;
+        }
+        ret = medusa_buffer_insert(buffer, offset, tmp, rc);
+        free(tmp);
         return ret;
 }
 
