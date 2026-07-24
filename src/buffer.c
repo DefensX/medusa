@@ -575,6 +575,13 @@ __attribute__ ((visibility ("default"))) int64_t medusa_buffer_choke (struct med
         if (ret < 0) {
                 return ret;
         }
+        if (buffer->flags & MEDUSA_BUFFER_FLAG_SHRINKABLE) {
+                rc = medusa_buffer_maybe_shrink(buffer, buffer->shrink_size, buffer->shrink_size);
+                if (rc != 0) {
+                        medusa_errorf("medusa_buffer_maybe_shrink failed, rc: %d", rc);
+                        return rc;
+                }
+        }
         if (ret > 0) {
                 rc = buffer_onevent(buffer, MEDUSA_BUFFER_EVENT_CHOKE, NULL);
                 if (rc != 0) {
@@ -1542,9 +1549,10 @@ __attribute__ ((visibility ("default"))) int medusa_buffer_init_options_default 
                 return -EINVAL;
         }
         memset(options, 0, sizeof(struct medusa_buffer_init_options));
-        options->type = MEDUSA_BUFFER_TYPE_DEFAULT;
-        options->flags = MEDUSA_BUFFER_FLAG_DEFAULT;
-        options->grow_size = MEDUSA_BUFFER_DEFAULT_GROW_SIZE;
+        options->type           = MEDUSA_BUFFER_TYPE_DEFAULT;
+        options->flags          = MEDUSA_BUFFER_FLAG_DEFAULT;
+        options->grow_size      = MEDUSA_BUFFER_DEFAULT_GROW_SIZE;
+        options->shrink_size    = MEDUSA_BUFFER_DEFAULT_SHRINK_SIZE;
         return 0;
 }
 
@@ -1592,8 +1600,10 @@ __attribute__ ((visibility ("default"))) struct medusa_buffer * medusa_buffer_cr
         if (MEDUSA_IS_ERR_OR_NULL(buffer)) {
                 return buffer;
         }
-        buffer->onevent = options->onevent;
-        buffer->context = options->context;
+        buffer->flags       = options->flags;
+        buffer->shrink_size = options->shrink_size;
+        buffer->onevent     = options->onevent;
+        buffer->context     = options->context;
         return buffer;
 }
 
