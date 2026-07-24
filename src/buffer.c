@@ -659,7 +659,7 @@ __attribute__ ((visibility ("default"))) int medusa_buffer_maybe_shrink (struct 
         if (t > INT64_MAX / 2) {
                 return 0;
         }
-        if (s <= t * 2) {
+        if (s <= t + t / 2) {
                 return 0;
         }
 
