@@ -648,10 +648,7 @@ __attribute__ ((visibility ("default"))) int medusa_buffer_maybe_shrink (struct 
         if (t < l)
                 t = l;
 
-        /* only shrink when clearly over-allocated (hysteresis vs. re-grow).
-         * t*2 would overflow if t is huge (a caller-supplied min close to
-         * INT64_MAX/2), but a real allocation can never be over-sized
-         * relative to a target that large, so there is nothing to shrink. */
+        /* only shrink when clearly over-allocated (hysteresis vs. re-grow). */
         if (t > INT64_MAX / 2) {
                 return 0;
         }
