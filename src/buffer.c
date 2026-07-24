@@ -624,6 +624,9 @@ __attribute__ ((visibility ("default"))) int medusa_buffer_maybe_shrink (struct 
         if (MEDUSA_IS_ERR_OR_NULL(buffer)) {
                 return -EINVAL;
         }
+        if (min < 0 || max < 0 || min > max) {
+                return -EINVAL;
+        }
 
         s = medusa_buffer_get_size(buffer);   /* allocated capacity */
         l = medusa_buffer_get_length(buffer); /* bytes in use       */
@@ -645,7 +648,13 @@ __attribute__ ((visibility ("default"))) int medusa_buffer_maybe_shrink (struct 
         if (t < l)
                 t = l;
 
-        /* only shrink when clearly over-allocated (hysteresis vs. re-grow) */
+        /* only shrink when clearly over-allocated (hysteresis vs. re-grow).
+         * t*2 would overflow if t is huge (a caller-supplied min close to
+         * INT64_MAX/2), but a real allocation can never be over-sized
+         * relative to a target that large, so there is nothing to shrink. */
+        if (t > INT64_MAX / 2) {
+                return 0;
+        }
         if (s <= t * 2) {
                 return 0;
         }
