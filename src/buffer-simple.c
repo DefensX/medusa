@@ -24,7 +24,7 @@ static struct medusa_pool *g_pool_buffer_simple;
 static int simple_buffer_resize (struct medusa_buffer_simple *simple, int64_t nsize)
 {
         void *data;
-        unsigned int size;
+        int64_t size;
         if (MEDUSA_IS_ERR_OR_NULL(simple)) {
                 return -EINVAL;
         }
