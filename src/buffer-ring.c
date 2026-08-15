@@ -52,7 +52,7 @@ static int ring_buffer_resize (struct medusa_buffer_ring *ring, int64_t nsize)
 {
         int rc;
         void *data;
-        unsigned int size;
+        int64_t size;
         if (MEDUSA_IS_ERR_OR_NULL(ring)) {
                 return -EINVAL;
         }
