@@ -32,8 +32,8 @@ enum {
 #define MEDUSA_BUFFER_EVENT_DESTROY             MEDUSA_BUFFER_EVENT_DESTROY
 };
 
-#define MEDUSA_BUFFER_DEFAULT_GROW_SIZE         1024
-#define MEDUSA_BUFFER_DEFAULT_SHRINK_SIZE       0
+#define MEDUSA_BUFFER_DEFAULT_GROW_SIZE         65536
+#define MEDUSA_BUFFER_DEFAULT_SHRINK_SIZE       65536
 
 struct medusa_buffer_init_options {
         unsigned int type;
