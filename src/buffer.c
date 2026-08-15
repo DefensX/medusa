@@ -576,7 +576,7 @@ __attribute__ ((visibility ("default"))) int64_t medusa_buffer_choke (struct med
                 return ret;
         }
         if (buffer->flags & MEDUSA_BUFFER_FLAG_SHRINKABLE) {
-                rc = medusa_buffer_maybe_shrink(buffer, buffer->shrink_size, buffer->shrink_size);
+                rc = medusa_buffer_maybe_shrink(buffer, buffer->shrink_size, INT64_MAX);
                 if (rc != 0) {
                         medusa_errorf("medusa_buffer_maybe_shrink failed, rc: %d", rc);
                         return rc;
