@@ -1678,18 +1678,22 @@ __attribute__ ((visibility ("default"))) int medusa_httprequest_make_request_unl
                 }
                 olen += rlen;
         }
-#if 0
-        rc = medusa_tcpsocket_printf_unlocked(httprequest->tcpsocket, "Connection: close\r\n");
-        if (rc < 0) {
-                ret = rc;
-                goto bail;
-        }
-#endif
-        if (httprequest->method &&  strcasecmp(httprequest->method, "POST") == 0) {
-                rc = medusa_tcpsocket_printf_unlocked(httprequest->tcpsocket, "Content-Length: %ld\r\n", (long int) length);
+        if (medusa_buffer_strcasecmp(httprequest->headers, 0, "Connection:") != 0 &&
+            medusa_buffer_strcasestr(httprequest->headers, 0, "\r\nConnection:") == -ENOENT) {
+                rc = medusa_tcpsocket_printf_unlocked(httprequest->tcpsocket, "Connection: close\r\n");
                 if (rc < 0) {
                         ret = rc;
                         goto bail;
+                }
+        }
+        if (httprequest->method &&  strcasecmp(httprequest->method, "POST") == 0) {
+                if (medusa_buffer_strcasecmp(httprequest->headers, 0, "Content-Length:") != 0 &&
+                    medusa_buffer_strcasestr(httprequest->headers, 0, "\r\nContent-Length:") == -ENOENT) {
+                        rc = medusa_tcpsocket_printf_unlocked(httprequest->tcpsocket, "Content-Length: %ld\r\n", (long int) length);
+                        if (rc < 0) {
+                                ret = rc;
+                                goto bail;
+                        }
                 }
         }
         rc = medusa_tcpsocket_printf_unlocked(httprequest->tcpsocket, "\r\n");
