@@ -1400,10 +1400,18 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                         goto bail;
                                                 }
                                         }
-                                        if (!medusa_tcpsocket_get_ssl_unlocked(tcpsocket)) {
+                                        if (medusa_tcpsocket_get_ssl_unlocked(tcpsocket) == 0) {
                                                 break;
-                                        } else if (tcpsocket->ssl_wantread  == 0 && tcpsocket->ssl_wantwrite == 0) {
-                                                break;
+                                        } else if (medusa_tcpsocket_get_ssl_unlocked(tcpsocket) == 1) {
+#if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
+                                                if (tcpsocket->ssl_wantread  == 0 &&
+                                                    tcpsocket->ssl_wantwrite == 0) {
+                                                        break;
+                                                }
+#endif
+                                        } else {
+                                                medusa_errorf("medusa_tcpsocket_get_ssl_unlocked failed");
+                                                goto bail;
                                         }
                                 }
                         }
