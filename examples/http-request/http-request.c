@@ -18,6 +18,7 @@
 #define OPTIONS_DEFAULT_DATA            NULL
 #define OPTIONS_DEFAULT_CONNECT_TIMEOUT 5.0
 #define OPTIONS_DEFAULT_READ_TIMEOUT    5.0
+#define OPTIONS_DEFAULT_EXIT_ON_REQUEST 0
 
 #define OPTION_HELP                     'h'
 #define OPTION_URL                      'u'
@@ -26,6 +27,7 @@
 #define OPTION_DATA                     'd'
 #define OPTION_CONNECT_TIMEOUT          'c'
 #define OPTION_READ_TIMEOUT             'r'
+#define OPTION_EXIT_ON_REQUEST          'R'
 
 static struct option longopts[] = {
         { "help",               no_argument,            NULL,        OPTION_HELP                },
@@ -35,6 +37,7 @@ static struct option longopts[] = {
         { "data",               required_argument,      NULL,        OPTION_DATA                },
         { "connect-timeout",    required_argument,      NULL,        OPTION_CONNECT_TIMEOUT     },
         { "read-timeout",       required_argument,      NULL,        OPTION_READ_TIMEOUT        },
+        { "exit-on-request",    required_argument,      NULL,        OPTION_EXIT_ON_REQUEST     },
         { NULL,                 0,                      NULL,        0                          },
 };
 
@@ -52,6 +55,7 @@ static void usage (const char *pname)
         fprintf(stdout, "  -d, --data  : request data (default: %s)\n", (OPTIONS_DEFAULT_DATA) ? OPTIONS_DEFAULT_DATA : "(null)");
         fprintf(stdout, "  -c, --connect-timeout: connect timeout (default: %.2f)\n", OPTIONS_DEFAULT_CONNECT_TIMEOUT);
         fprintf(stdout, "  -r, --read-timeout   : read timeout (default: %.2f)\n", OPTIONS_DEFAULT_READ_TIMEOUT);
+        fprintf(stdout, "  -R, --exit-on-request: exit on request (default: %d)\n", OPTIONS_DEFAULT_EXIT_ON_REQUEST);
         fprintf(stdout, "  -h, --help  : this text\n");
         fprintf(stdout, "\n");
         fprintf(stdout, "example:\n");
@@ -60,14 +64,21 @@ static void usage (const char *pname)
         fprintf(stdout, "  %s -u http://127.0.0.1/ -m post -h 'a:b' -h 'c:d' -d 'data'\n", pname);
 }
 
+struct http_request_context {
+        int exit_on_request;
+};
+
 static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned int events, void *context, void *param)
 {
+        struct http_request_context *http_request_context = context;
         (void) httprequest;
         (void) events;
-        (void) context;
         (void) param;
         fprintf(stderr, "httprequest state: %d, %-35s events: 0x%08x, %s\n", medusa_httprequest_get_state(httprequest), medusa_httprequest_state_string(medusa_httprequest_get_state(httprequest)), events, medusa_httprequest_event_string(events));
         if (events & MEDUSA_HTTPREQUEST_EVENT_REQUESTED) {
+                if (http_request_context->exit_on_request) {
+                        medusa_monitor_break(medusa_httprequest_get_monitor(httprequest));
+                }
         }
         if (events & MEDUSA_HTTPREQUEST_EVENT_RECEIVED) {
                 const struct medusa_httprequest_reply *httprequest_reply;
@@ -151,7 +162,10 @@ int main (int argc, char *argv[])
 
         const char *option_url;
         const char *option_method;
+        int option_method_set;
+        int option_data_set;
         const char *option_data;
+        int option_exit_on_request;
         double option_connect_timeout;
         double option_read_timeout;
 
@@ -160,6 +174,8 @@ int main (int argc, char *argv[])
 
         struct medusa_httprequest_init_options httprequest_init_options;
         struct medusa_httprequest *httprequest;
+
+        struct http_request_context http_request_context;
 
 #if defined(__WINDOWS__)
         WSADATA wsaData;
@@ -170,9 +186,12 @@ int main (int argc, char *argv[])
 
         option_url             = OPTIONS_DEFAULT_URL;
         option_method          = OPTIONS_DEFAULT_METHOD;
+        option_method_set      = 0;
         option_data            = NULL;
+        option_data_set        = 0;
         option_connect_timeout = OPTIONS_DEFAULT_CONNECT_TIMEOUT;
         option_read_timeout    = OPTIONS_DEFAULT_READ_TIMEOUT;
+        option_exit_on_request = OPTIONS_DEFAULT_EXIT_ON_REQUEST;
 
         _argv = malloc(sizeof(char *) * (argc + 1));
 
@@ -180,7 +199,7 @@ int main (int argc, char *argv[])
         for (_argc = 0; _argc < argc; _argc++) {
                 _argv[_argc] = argv[_argc];
         }
-        while ((c = getopt_long(_argc, _argv, "hu:m:e:d:c:r:", longopts, NULL)) != -1) {
+        while ((c = getopt_long(_argc, _argv, "hu:m:e:d:c:r:R:", longopts, NULL)) != -1) {
                 switch (c) {
                         case OPTION_HELP:
                                 usage(argv[0]);
@@ -190,11 +209,13 @@ int main (int argc, char *argv[])
                                 break;
                         case OPTION_METHOD:
                                 option_method = optarg;
+                                option_method_set = 1;
                                 break;
                         case OPTION_HEADER:
                                 break;
                         case OPTION_DATA:
                                 option_data = optarg;
+                                option_data_set = 1;
                                 break;
                         case OPTION_CONNECT_TIMEOUT:
                                 option_connect_timeout = atof(optarg);
@@ -202,11 +223,30 @@ int main (int argc, char *argv[])
                         case OPTION_READ_TIMEOUT:
                                 option_read_timeout = atof(optarg);
                                 break;
+                        case OPTION_EXIT_ON_REQUEST:
+                                option_exit_on_request = !!atoi(optarg);
+                                break;
                         default:
                                 fprintf(stderr, "invalid option: %s\n", argv[optind - 1]);
                                 goto bail;
                 }
         }
+
+        if (!option_method_set) {
+                if (option_data_set && option_data != NULL && strlen(option_data) > 0) {
+                        option_method = "POST";
+                } else {
+                        option_method = "GET";
+                }
+        }
+
+        http_request_context.exit_on_request = option_exit_on_request;
+        fprintf(stderr, "url            : %s\n", option_url);
+        fprintf(stderr, "method         : %s\n", option_method);
+        fprintf(stderr, "data           : %s\n", (option_data) ? option_data : "(null)");
+        fprintf(stderr, "connect timeout: %.2f\n", option_connect_timeout);
+        fprintf(stderr, "read timeout   : %.2f\n", option_read_timeout);
+        fprintf(stderr, "exit on request: %d\n", option_exit_on_request);
 
         monitor = medusa_monitor_create_with_options(NULL);
         if (monitor == NULL) {
@@ -217,7 +257,7 @@ int main (int argc, char *argv[])
         medusa_httprequest_init_options_default(&httprequest_init_options);
         httprequest_init_options.monitor = monitor;
         httprequest_init_options.onevent = httprequest_onevent;
-        httprequest_init_options.context = NULL;
+        httprequest_init_options.context = &http_request_context;
 
         httprequest = medusa_httprequest_create_with_options(&httprequest_init_options);
         if (MEDUSA_IS_ERR_OR_NULL(httprequest)) {
