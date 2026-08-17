@@ -858,13 +858,15 @@ short_buffer:
 
 out:    medusa_monitor_unlock(monitor);
         return 0;
-bail:   struct medusa_websocketclient_event_error medusa_websocketclient_event_error;
-        websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR, -error, __LINE__);
-        medusa_websocketclient_event_error.state  = websocketclient->state;
-        medusa_websocketclient_event_error.error  = websocketclient->error;
-        medusa_websocketclient_event_error.line   = __LINE__;
-        medusa_websocketclient_event_error.reason = MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_INTERNAL;
-        medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_ERROR, &medusa_websocketclient_event_error);
+bail:   {
+                struct medusa_websocketclient_event_error medusa_websocketclient_event_error;
+                websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR, -error, __LINE__);
+                medusa_websocketclient_event_error.state  = websocketclient->state;
+                medusa_websocketclient_event_error.error  = websocketclient->error;
+                medusa_websocketclient_event_error.line   = __LINE__;
+                medusa_websocketclient_event_error.reason = MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_INTERNAL;
+                medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_ERROR, &medusa_websocketclient_event_error);
+        }
         medusa_monitor_unlock(monitor);
         return 0;
 }
@@ -1249,12 +1251,14 @@ __attribute__ ((visibility ("default"))) int64_t medusa_websocketclient_write_un
         }
 
         return length;
-bail:   struct medusa_websocketclient_event_error medusa_websocketclient_event_error;
-        websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR, -error, __LINE__);
-        medusa_websocketclient_event_error.state  = websocketclient->state;
-        medusa_websocketclient_event_error.error  = websocketclient->error;
-        medusa_websocketclient_event_error.line   = __LINE__;
-        medusa_websocketclient_event_error.reason = MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_INTERNAL;
+bail:   {
+                struct medusa_websocketclient_event_error medusa_websocketclient_event_error;
+                websocketclient_set_state(websocketclient, MEDUSA_WEBSOCKETCLIENT_STATE_ERROR, -error, __LINE__);
+                medusa_websocketclient_event_error.state  = websocketclient->state;
+                medusa_websocketclient_event_error.error  = websocketclient->error;
+                medusa_websocketclient_event_error.line   = __LINE__;
+                medusa_websocketclient_event_error.reason = MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_INTERNAL;
+        }
         medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_ERROR, &medusa_websocketclient_event_error);
         return error;
 }
