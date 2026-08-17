@@ -1258,8 +1258,8 @@ bail:   {
                 medusa_websocketclient_event_error.error  = websocketclient->error;
                 medusa_websocketclient_event_error.line   = __LINE__;
                 medusa_websocketclient_event_error.reason = MEDUSA_WEBSOCKETCLIENT_ERROR_REASON_INTERNAL;
+                medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_ERROR, &medusa_websocketclient_event_error);
         }
-        medusa_websocketclient_onevent_unlocked(websocketclient, MEDUSA_WEBSOCKETCLIENT_EVENT_ERROR, &medusa_websocketclient_event_error);
         return error;
 }
 
