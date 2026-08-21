@@ -27,7 +27,7 @@
 #define OPTION_HELP                             'h'
 #define OPTION_URL                              'u'
 #define OPTION_METHOD                           'm'
-#define OPTION_HEADER                           'e'
+#define OPTION_HEADER                           'H'
 #define OPTION_DATA                             'd'
 #define OPTION_CONNECT_TIMEOUT                  'c'
 #define OPTION_READ_TIMEOUT                     'r'
@@ -62,7 +62,7 @@ static void usage (const char *pname)
         fprintf(stdout, "options:\n");
         fprintf(stdout, "  -u, --url   : request url (default: %s)\n", OPTIONS_DEFAULT_URL);
         fprintf(stdout, "  -m, --method: request method (default: %s)\n", OPTIONS_DEFAULT_METHOD);
-        fprintf(stdout, "  -e, --header: add header\n");
+        fprintf(stdout, "  -H, --header: add header\n");
         fprintf(stdout, "  -d, --data  : request data (default: %s)\n", (OPTIONS_DEFAULT_DATA) ? OPTIONS_DEFAULT_DATA : "(null)");
         fprintf(stdout, "  -c, --connect-timeout: connect timeout (default: %.2f)\n", OPTIONS_DEFAULT_CONNECT_TIMEOUT);
         fprintf(stdout, "  -r, --read-timeout   : read timeout (default: %.2f)\n", OPTIONS_DEFAULT_READ_TIMEOUT);
@@ -87,9 +87,9 @@ static void usage (const char *pname)
         fprintf(stdout, "  -h, --help  : this text\n");
         fprintf(stdout, "\n");
         fprintf(stdout, "example:\n");
-        fprintf(stdout, "  %s -u http://127.0.0.1/ -m get -h 'a:b' -h 'c:d'\n", pname);
-        fprintf(stdout, "  %s -u http://127.0.0.1/ -m head -h 'a:b' -h 'c:d'\n", pname);
-        fprintf(stdout, "  %s -u http://127.0.0.1/ -m post -h 'a:b' -h 'c:d' -d 'data'\n", pname);
+        fprintf(stdout, "  %s -u http://127.0.0.1/ -m get -H 'a:b' -H 'c:d'\n", pname);
+        fprintf(stdout, "  %s -u http://127.0.0.1/ -m head -H 'a:b' -H 'c:d'\n", pname);
+        fprintf(stdout, "  %s -u http://127.0.0.1/ -m post -H 'a:b' -H 'c:d' -d 'data'\n", pname);
 }
 
 struct http_request_context {
@@ -290,7 +290,7 @@ int main (int argc, char *argv[])
         for (_argc = 0; _argc < argc; _argc++) {
                 _argv[_argc] = argv[_argc];
         }
-        while ((c = getopt_long(_argc, _argv, "hu:m:e:d:c:r:R:", longopts, NULL)) != -1) {
+        while ((c = getopt_long(_argc, _argv, "hu:m:H:d:c:r:R:", longopts, NULL)) != -1) {
                 switch (c) {
                         case OPTION_HELP:
                                 usage(argv[0]);
@@ -417,7 +417,7 @@ int main (int argc, char *argv[])
         for (_argc = 0; _argc < argc; _argc++) {
                 _argv[_argc] = argv[_argc];
         }
-        while ((c = getopt_long(_argc, _argv, ":e:", longopts, NULL)) != -1) {
+        while ((c = getopt_long(_argc, _argv, ":H:", longopts, NULL)) != -1) {
                 switch (c) {
                         case OPTION_HEADER:
                                 rc = medusa_httprequest_add_header(httprequest, optarg, NULL);
