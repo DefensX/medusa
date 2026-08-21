@@ -80,6 +80,60 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
                         medusa_monitor_break(medusa_httprequest_get_monitor(httprequest));
                 }
         }
+        if (events & MEDUSA_HTTPREQUEST_EVENT_RECEIVED_STATUS) {
+                const struct medusa_httprequest_reply *httprequest_reply;
+                const struct medusa_httprequest_reply_status *httprequest_reply_status;
+
+                httprequest_reply = medusa_httprequest_get_reply(httprequest);
+                if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply)) {
+                        fprintf(stderr, "hettprequest reply is invalid\n");
+                        goto bail;
+                }
+
+                httprequest_reply_status = medusa_httprequest_reply_get_status(httprequest_reply);
+                if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply_status)) {
+                        fprintf(stderr, "hettprequest reply status is invalid\n");
+                        goto bail;
+                }
+                fprintf(stderr, "status:\n");
+                fprintf(stderr, "  code : %lld\n", (long long int) medusa_httprequest_reply_status_get_code(httprequest_reply_status));
+                fprintf(stderr, "  value: %s\n", medusa_httprequest_reply_status_get_value(httprequest_reply_status));
+        }
+        if (events & MEDUSA_HTTPREQUEST_EVENT_RECEIVED_HEADERS) {
+                const struct medusa_httprequest_reply *httprequest_reply;
+                const struct medusa_httprequest_reply_status *httprequest_reply_status;
+                const struct medusa_httprequest_reply_header *httprequest_reply_header;
+                const struct medusa_httprequest_reply_headers *httprequest_reply_headers;
+
+                httprequest_reply = medusa_httprequest_get_reply(httprequest);
+                if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply)) {
+                        fprintf(stderr, "hettprequest reply is invalid\n");
+                        goto bail;
+                }
+
+                httprequest_reply_status = medusa_httprequest_reply_get_status(httprequest_reply);
+                if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply_status)) {
+                        fprintf(stderr, "hettprequest reply status is invalid\n");
+                        goto bail;
+                }
+                fprintf(stderr, "status:\n");
+                fprintf(stderr, "  code : %lld\n", (long long int) medusa_httprequest_reply_status_get_code(httprequest_reply_status));
+                fprintf(stderr, "  value: %s\n", medusa_httprequest_reply_status_get_value(httprequest_reply_status));
+
+                httprequest_reply_headers = medusa_httprequest_reply_get_headers(httprequest_reply);
+                if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply_headers)) {
+                        fprintf(stderr, "hettprequest reply headers is invalid\n");
+                        goto bail;
+                }
+                fprintf(stderr, "headers: %lld\n", (long long int) medusa_httprequest_reply_headers_get_count(httprequest_reply_headers));
+                for (httprequest_reply_header = medusa_httprequest_reply_headers_get_first(httprequest_reply_headers);
+                     httprequest_reply_header;
+                     httprequest_reply_header = medusa_httprequest_reply_header_get_next(httprequest_reply_header)) {
+                        fprintf(stderr, "  %-15s : %s\n",
+                                medusa_httprequest_reply_header_get_key(httprequest_reply_header),
+                                medusa_httprequest_reply_header_get_value(httprequest_reply_header));
+                }
+        }
         if (events & MEDUSA_HTTPREQUEST_EVENT_RECEIVED) {
                 const struct medusa_httprequest_reply *httprequest_reply;
                 const struct medusa_httprequest_reply_status *httprequest_reply_status;

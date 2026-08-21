@@ -405,6 +405,16 @@ static int httprequest_httpparser_on_header_field (http_parser *http_parser, con
         int rc;
         struct medusa_httprequest_reply_header *header;
         struct medusa_httprequest *httprequest = http_parser->data;
+        if (httprequest->reply->headers.count == 0) {
+                struct medusa_httprequest_event_received_status medusa_httprequest_event_received_status;
+                medusa_httprequest_event_received_status.status = &httprequest->reply->status;
+                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED_STATUS, &medusa_httprequest_event_received_status);
+                if (rc < 0) {
+                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
+                        httprequest->onevent_error = rc;
+                        return rc;
+                }
+        }
         header = medusa_httprequest_reply_header_create();
         if (MEDUSA_IS_ERR_OR_NULL(header)) {
                 return MEDUSA_PTR_ERR(header);
@@ -439,6 +449,16 @@ static int httprequest_httpparser_on_headers_complete (http_parser *http_parser)
 {
         int rc;
         struct medusa_httprequest *httprequest = http_parser->data;
+        {
+                struct medusa_httprequest_event_received_headers medusa_httprequest_event_received_headers;
+                medusa_httprequest_event_received_headers.headers = &httprequest->reply->headers;
+                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED_HEADERS, &medusa_httprequest_event_received_headers);
+                if (rc < 0) {
+                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
+                        httprequest->onevent_error = rc;
+                        return rc;
+                }
+        }
         if (httprequest->method != NULL &&
             strcasecmp(httprequest->method, "head") == 0) {
                 rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_RECEIVED);
@@ -447,11 +467,15 @@ static int httprequest_httpparser_on_headers_complete (http_parser *http_parser)
                         httprequest->onevent_error = rc;
                         return rc;
                 }
-                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED, NULL);
-                if (rc < 0) {
-                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                        httprequest->onevent_error = rc;
-                        return rc;
+                {
+                        struct medusa_httprequest_event_received medusa_httprequest_event_received;
+                        medusa_httprequest_event_received.reply = httprequest->reply;
+                        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED, &medusa_httprequest_event_received);
+                        if (rc < 0) {
+                                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
+                                httprequest->onevent_error = rc;
+                                return rc;
+                        }
                 }
         }
         return 0;
@@ -489,11 +513,15 @@ static int httprequest_httpparser_on_message_complete (http_parser *http_parser)
                 httprequest->onevent_error = rc;
                 return rc;
         }
-        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED, NULL);
-        if (rc < 0) {
-                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                httprequest->onevent_error = rc;
-                return rc;
+        {
+                struct medusa_httprequest_event_received medusa_httprequest_event_received;
+                medusa_httprequest_event_received.reply = httprequest->reply;
+                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED, &medusa_httprequest_event_received);
+                if (rc < 0) {
+                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
+                        httprequest->onevent_error = rc;
+                        return rc;
+                }
         }
         return 0;
 }
@@ -742,10 +770,15 @@ static int httprequest_tcpsocket_onevent (struct medusa_tcpsocket *tcpsocket, un
                                 medusa_errorf("httprequest_set_state failed, rc: %d", rc);
                                 goto bail;
                         }
-                        rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED, NULL);
-                        if (rc < 0) {
-                                medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
-                                goto bail;
+                        {
+                                struct medusa_httprequest_event_received medusa_httprequest_event_received;
+                                medusa_httprequest_event_received.reply = httprequest->reply;
+                                rc = medusa_httprequest_onevent_unlocked(httprequest, MEDUSA_HTTPREQUEST_EVENT_RECEIVED, &medusa_httprequest_event_received);
+                                if (rc < 0) {
+                                        medusa_errorf("medusa_httprequest_onevent_unlocked failed, rc: %d", rc);
+                                        httprequest->onevent_error = rc;
+                                        return rc;
+                                }
                         }
                 }
                 rc = httprequest_set_state(httprequest, MEDUSA_HTTPREQUEST_STATE_DISCONNECTED);
@@ -2114,6 +2147,8 @@ __attribute__ ((visibility ("default"))) const char * medusa_httprequest_event_s
         if (events == MEDUSA_HTTPREQUEST_EVENT_REQUESTED)       return "MEDUSA_HTTPREQUEST_EVENT_REQUESTED";
         if (events == MEDUSA_HTTPREQUEST_EVENT_RECEIVING)       return "MEDUSA_HTTPREQUEST_EVENT_RECEIVING";
         if (events == MEDUSA_HTTPREQUEST_EVENT_RECEIVE_TIMEOUT) return "MEDUSA_HTTPREQUEST_EVENT_RECEIVE_TIMEOUT";
+        if (events == MEDUSA_HTTPREQUEST_EVENT_RECEIVED_STATUS) return "MEDUSA_HTTPREQUEST_EVENT_RECEIVED_STATUS";
+        if (events == MEDUSA_HTTPREQUEST_EVENT_RECEIVED_HEADERS)return "MEDUSA_HTTPREQUEST_EVENT_RECEIVED_HEADERS";
         if (events == MEDUSA_HTTPREQUEST_EVENT_RECEIVED)        return "MEDUSA_HTTPREQUEST_EVENT_RECEIVED";
         if (events == MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED)    return "MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED";
         if (events == MEDUSA_HTTPREQUEST_EVENT_ERROR)           return "MEDUSA_HTTPREQUEST_EVENT_ERROR";

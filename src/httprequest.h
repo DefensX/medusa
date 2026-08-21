@@ -30,11 +30,13 @@ enum {
         MEDUSA_HTTPREQUEST_EVENT_REQUESTED              = (1 <<  8), /* 0x00000100 */
         MEDUSA_HTTPREQUEST_EVENT_RECEIVING              = (1 <<  9), /* 0x00000200 */
         MEDUSA_HTTPREQUEST_EVENT_RECEIVE_TIMEOUT        = (1 << 10), /* 0x00000400 */
-        MEDUSA_HTTPREQUEST_EVENT_RECEIVED               = (1 << 11), /* 0x00000800 */
-        MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED           = (1 << 12), /* 0x00001000 */
-        MEDUSA_HTTPREQUEST_EVENT_ERROR                  = (1 << 13), /* 0x00002000 */
-        MEDUSA_HTTPREQUEST_EVENT_STATE_CHANGED          = (1 << 14), /* 0x00004000 */
-        MEDUSA_HTTPREQUEST_EVENT_DESTROY                = (1 << 15), /* 0x00008000 */
+        MEDUSA_HTTPREQUEST_EVENT_RECEIVED_STATUS        = (1 << 11), /* 0x00000800 */
+        MEDUSA_HTTPREQUEST_EVENT_RECEIVED_HEADERS       = (1 << 12), /* 0x00001000 */
+        MEDUSA_HTTPREQUEST_EVENT_RECEIVED               = (1 << 13), /* 0x00002000 */
+        MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED           = (1 << 14), /* 0x00004000 */
+        MEDUSA_HTTPREQUEST_EVENT_ERROR                  = (1 << 15), /* 0x00008000 */
+        MEDUSA_HTTPREQUEST_EVENT_STATE_CHANGED          = (1 << 16), /* 0x00010000 */
+        MEDUSA_HTTPREQUEST_EVENT_DESTROY                = (1 << 17), /* 0x00020000 */
 #define MEDUSA_HTTPREQUEST_EVENT_RESOLVING              MEDUSA_HTTPREQUEST_EVENT_RESOLVING
 #define MEDUSA_HTTPREQUEST_EVENT_RESOLVE_TIMEOUT        MEDUSA_HTTPREQUEST_EVENT_RESOLVE_TIMEOUT
 #define MEDUSA_HTTPREQUEST_EVENT_RESOLVED               MEDUSA_HTTPREQUEST_EVENT_RESOLVED
@@ -46,6 +48,8 @@ enum {
 #define MEDUSA_HTTPREQUEST_EVENT_REQUESTED              MEDUSA_HTTPREQUEST_EVENT_REQUESTED
 #define MEDUSA_HTTPREQUEST_EVENT_RECEIVING              MEDUSA_HTTPREQUEST_EVENT_RECEIVING
 #define MEDUSA_HTTPREQUEST_EVENT_RECEIVE_TIMEOUT        MEDUSA_HTTPREQUEST_EVENT_RECEIVE_TIMEOUT
+#define MEDUSA_HTTPREQUEST_EVENT_RECEIVED_STATUS        MEDUSA_HTTPREQUEST_EVENT_RECEIVED_STATUS
+#define MEDUSA_HTTPREQUEST_EVENT_RECEIVED_HEADERS       MEDUSA_HTTPREQUEST_EVENT_RECEIVED_HEADERS
 #define MEDUSA_HTTPREQUEST_EVENT_RECEIVED               MEDUSA_HTTPREQUEST_EVENT_RECEIVED
 #define MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED           MEDUSA_HTTPREQUEST_EVENT_DISCONNECTED
 #define MEDUSA_HTTPREQUEST_EVENT_ERROR                  MEDUSA_HTTPREQUEST_EVENT_ERROR
@@ -89,6 +93,11 @@ struct medusa_httprequest_init_options {
         void *context;
 };
 
+struct medusa_httprequest_event_state_changed {
+        unsigned int pstate;
+        unsigned int state;
+};
+
 enum {
         MEDUSA_HTTPREQUEST_ERROR_REASON_PARSER          = 0,
         MEDUSA_HTTPREQUEST_ERROR_REASON_TCPSOCKET       = 1
@@ -113,9 +122,16 @@ struct medusa_httprequest_event_error {
         } u;
 };
 
-struct medusa_httprequest_event_state_changed {
-        unsigned int pstate;
-        unsigned int state;
+struct medusa_httprequest_event_received_status {
+        const struct medusa_httprequest_reply_status *status;
+};
+
+struct medusa_httprequest_event_received_headers {
+        const struct medusa_httprequest_reply_headers *headers;
+};
+
+struct medusa_httprequest_event_received {
+        const struct medusa_httprequest_reply *reply;
 };
 
 #ifdef __cplusplus
