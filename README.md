@@ -43,17 +43,19 @@ or
 
 #### 3.2.1 openssl
 
+    OPENSSL=openssl-3.5.7
+
     mkdir -p 3rdparty/openssl-mingw64
-    cd 3rdparty/openssl-mingw64
-    curl -O -L https://www.openssl.org/source/openssl-3.5.7.tar.gz
-    tar -zxvf openssl-3.5.7.tar.gz -C ./
-    cd openssl-3.5.7
-    CC= CROSS_COMPILE=x86_64-w64-mingw32- ./Configure --prefix=/usr/local --libdir=lib no-idea no-mdc2 no-rc5 no-shared no-tests no-apps mingw64
+    curl -L https://www.openssl.org/source/$OPENSSL.tar.gz | tar -xz -C 3rdparty/openssl-mingw64
+
+    cd 3rdparty/openssl-mingw64/$OPENSSL
+    CC= CROSS_COMPILE=x86_64-w64-mingw32- ./Configure \
+        --prefix=/usr/local --libdir=lib \
+        no-apps no-idea no-mdc2 no-rc5 no-shared no-tests \
+        mingw64
     make -j 8 build_libs
     make -j 8 DESTDIR=../../install_mingw64 install_sw
-    cd ../
-    cd ../
-    cd ../
+    cd ../../..
 
     CFLAGS="-DWINVER=_WIN32_WINNT_WIN10 -D_WIN32_WINNT=_WIN32_WINNT_WIN10 -I`pwd`/3rdparty/install_mingw64/usr/local/include" \
 	LDFLAGS="-L`pwd`/3rdparty/install_mingw64/usr/local/lib" \
