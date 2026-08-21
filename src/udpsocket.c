@@ -577,7 +577,7 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                         medusa_errorf("state: %d is invalid", udpsocket->state);
                         goto bail;
                 }
-        } else if (events & MEDUSA_IO_EVENT_ERR) {
+        } else if (events & MEDUSA_IO_EVENT_HUP) {
                 int valopt;
                 socklen_t vallen;
                 struct medusa_udpsocket_event_error medusa_udpsocket_event_error;
@@ -585,7 +585,7 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                 vallen = sizeof(valopt);
                 rc = getsockopt(medusa_io_get_fd_unlocked(io), SOL_SOCKET, SO_ERROR, (void *) &valopt, &vallen);
                 if (rc < 0 || valopt == 0) {
-                        valopt = EIO;
+                        valopt = ECONNRESET;
                 }
                 medusa_udpsocket_event_error.state = udpsocket->state;
                 medusa_udpsocket_event_error.error = valopt;
@@ -600,7 +600,7 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                         medusa_errorf("medusa_timer_set_interval_unlocked failed, rc: %d", rc);
                         goto bail;
                 }
-        } else if (events & MEDUSA_IO_EVENT_HUP) {
+        } else if (events & MEDUSA_IO_EVENT_ERR) {
                 int valopt;
                 socklen_t vallen;
                 struct medusa_udpsocket_event_error medusa_udpsocket_event_error;
@@ -608,7 +608,7 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                 vallen = sizeof(valopt);
                 rc = getsockopt(medusa_io_get_fd_unlocked(io), SOL_SOCKET, SO_ERROR, (void *) &valopt, &vallen);
                 if (rc < 0 || valopt == 0) {
-                        valopt = ECONNRESET;
+                        valopt = EIO;
                 }
                 medusa_udpsocket_event_error.state = udpsocket->state;
                 medusa_udpsocket_event_error.error = valopt;
