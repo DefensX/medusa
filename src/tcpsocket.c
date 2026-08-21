@@ -852,7 +852,7 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
          * while read interest is disabled. run the read path anyway, so any
          * pending data is drained and the disconnect is classified by read()
          * rather than being guessed from the hup alone. */
-        if ((events & MEDUSA_IO_EVENT_HUP) &&
+        if ((events & (MEDUSA_IO_EVENT_HUP | MEDUSA_IO_EVENT_ERR)) &&
             !(events & MEDUSA_IO_EVENT_IN) &&
             ((tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTING) ||
              (tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTED))) {
@@ -1185,7 +1185,14 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                 struct medusa_iovec iovec;
                                 n = 4096;
 #if defined(__WINDOWS__)
-                                rc = -ENOTSUP;
+                                {
+                                        u_long available;
+                                        available = 0;
+                                        rc = ioctlsocket(medusa_io_get_fd_unlocked(io), FIONREAD, &available);
+                                        if (rc == 0) {
+                                                n = (int) available;
+                                        }
+                                }
 #else
                                 rc = ioctl(medusa_io_get_fd_unlocked(io), FIONREAD, &n);
 #endif
@@ -1276,6 +1283,19 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                 ERR_clear_error();
                                                 errno = 0;
                                                 rlength = SSL_read(tcpsocket->ssl, iovec.iov_base, iovec.iov_len);
+#if defined(__WINDOWS__)
+                                                if (rlength <= 0) {
+                                                        switch (WSAGetLastError()) {
+                                                                case 0:                 break;
+                                                                case WSAEWOULDBLOCK:    errno = EWOULDBLOCK;    break;
+                                                                case WSATRY_AGAIN:      errno = EAGAIN;         break;
+                                                                case WSAEINTR:          errno = EINTR;          break;
+                                                                case WSAECONNRESET:     errno = ECONNRESET;     break;
+                                                                case WSAECONNABORTED:   errno = ECONNABORTED;   break;
+                                                                default:                errno = EIO;            break;
+                                                        }
+                                                }
+#endif
                                                 if (rlength <= 0) {
                                                         int error;
                                                         error = SSL_get_error(tcpsocket->ssl, rlength);
@@ -1330,18 +1350,21 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
 #endif
                                         {
                                                 rlength = recv(medusa_io_get_fd_unlocked(io), iovec.iov_base, iovec.iov_len, 0);
-                                        }
-                                        if (rlength < 0) {
 #if defined(__WINDOWS__)
                                                 if (rlength == SOCKET_ERROR) {
                                                         switch (WSAGetLastError()) {
+                                                                case 0:                 break;
                                                                 case WSAEWOULDBLOCK:    errno = EWOULDBLOCK;    break;
                                                                 case WSATRY_AGAIN:      errno = EAGAIN;         break;
                                                                 case WSAEINTR:          errno = EINTR;          break;
                                                                 case WSAECONNRESET:     errno = ECONNRESET;     break;
+                                                                case WSAECONNABORTED:   errno = ECONNABORTED;   break;
+                                                                default:                errno = EIO;            break;
                                                         }
                                                 }
 #endif
+                                        }
+                                        if (rlength < 0) {
                                                 if (errno != EINTR &&
                                                     errno != EAGAIN &&
                                                     errno != EWOULDBLOCK) {
@@ -1411,6 +1434,10 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                         goto bail;
                                                 }
                                         }
+                                        if ((events & (MEDUSA_IO_EVENT_ERR | MEDUSA_IO_EVENT_HUP)) &&
+                                            tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTED) {
+                                                continue;
+                                        }
                                         if (medusa_tcpsocket_get_ssl_unlocked(tcpsocket) == 0) {
                                                 break;
                                         } else if (medusa_tcpsocket_get_ssl_unlocked(tcpsocket) == 1) {
@@ -1433,15 +1460,29 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                 }
         }
         if (events & MEDUSA_IO_EVENT_ERR) {
-                if (tcpsocket->state != MEDUSA_TCPSOCKET_STATE_ERROR) {
+                if ((tcpsocket->state != MEDUSA_TCPSOCKET_STATE_ERROR) &&
+                    (tcpsocket->state != MEDUSA_TCPSOCKET_STATE_DISCONNECTED)) {
                         int valopt;
                         socklen_t vallen;
                         struct medusa_tcpsocket_event_error medusa_tcpsocket_event_error;
                         valopt = 0;
                         vallen = sizeof(valopt);
                         rc = getsockopt(medusa_io_get_fd_unlocked(io), SOL_SOCKET, SO_ERROR, (void *) &valopt, &vallen);
-                        if (rc < 0 || valopt == 0) {
+                        if (rc < 0) {
                                 valopt = EIO;
+                        }
+                        if (valopt == 0) {
+                                rc = tcpsocket_set_state(tcpsocket, MEDUSA_TCPSOCKET_STATE_DISCONNECTED, 0, __LINE__);
+                                if (rc < 0) {
+                                        medusa_errorf("tcpsocket_set_state failed, rc: %d", rc);
+                                        goto bail;
+                                }
+                                rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_DISCONNECTED, NULL);
+                                if (rc < 0) {
+                                        medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
+                                        goto bail;
+                                }
+                                goto out_err;
                         }
                         medusa_tcpsocket_event_error.state = tcpsocket->state;
                         medusa_tcpsocket_event_error.error = valopt;
@@ -1456,6 +1497,7 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                 medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
                                 goto bail;
                         }
+out_err:        ;
                 }
         }
         /* hup means both directions are torn down, which a graceful close
