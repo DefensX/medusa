@@ -15,13 +15,9 @@ override MEDUSA_POLL_KQUEUE_ENABLE    	= n
 endif
 
 ifeq ($(__WINDOWS__), y)
-override MEDUSA_EXEC_ENABLE		= n
 override MEDUSA_POLL_POLL_ENABLE   	= n
-override MEDUSA_POLL_SELECT_ENABLE      = n
-override MEDUSA_POLL_WSAPOLL_ENABLE     = y
 override MEDUSA_SIGNAL_SIGACTION_ENABLE	= n
 override MEDUSA_SIGNAL_SIGNALFD_ENABLE	= n
-override MEDUSA_LIBMEDUSA_TARGET_O	= n
 override MEDUSA_LIBMEDUSA_TARGET_SO	= n
 endif
 
