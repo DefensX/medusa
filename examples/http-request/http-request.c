@@ -13,32 +13,43 @@
 #include <medusa/httprequest.h>
 #include <medusa/monitor.h>
 
-#define OPTIONS_DEFAULT_URL             "http://127.0.0.1"
-#define OPTIONS_DEFAULT_METHOD          "get"
-#define OPTIONS_DEFAULT_DATA            NULL
-#define OPTIONS_DEFAULT_CONNECT_TIMEOUT 5.0
-#define OPTIONS_DEFAULT_READ_TIMEOUT    5.0
-#define OPTIONS_DEFAULT_EXIT_ON_REQUEST 0
+#define OPTIONS_DEFAULT_URL                     "http://127.0.0.1"
+#define OPTIONS_DEFAULT_METHOD                  "get"
+#define OPTIONS_DEFAULT_DATA                    NULL
+#define OPTIONS_DEFAULT_CONNECT_TIMEOUT         5.0
+#define OPTIONS_DEFAULT_READ_TIMEOUT            5.0
+#define OPTIONS_DEFAULT_EXIT_ON_REQUEST         0
 
-#define OPTION_HELP                     'h'
-#define OPTION_URL                      'u'
-#define OPTION_METHOD                   'm'
-#define OPTION_HEADER                   'e'
-#define OPTION_DATA                     'd'
-#define OPTION_CONNECT_TIMEOUT          'c'
-#define OPTION_READ_TIMEOUT             'r'
-#define OPTION_EXIT_ON_REQUEST          'R'
+#define OPTIONS_DEFAULT_MEDUSA_MONITOR_POLL     MEDUSA_MONITOR_POLL_DEFAULT
+#define OPTIONS_DEFAULT_MEDUSA_MONITOR_SIGNAL   MEDUSA_MONITOR_SIGNAL_DEFAULT
+#define OPTIONS_DEFAULT_MEDUSA_MONITOR_TIMER    MEDUSA_MONITOR_TIMER_DEFAULT
+
+#define OPTION_HELP                             'h'
+#define OPTION_URL                              'u'
+#define OPTION_METHOD                           'm'
+#define OPTION_HEADER                           'e'
+#define OPTION_DATA                             'd'
+#define OPTION_CONNECT_TIMEOUT                  'c'
+#define OPTION_READ_TIMEOUT                     'r'
+#define OPTION_EXIT_ON_REQUEST                  'R'
+
+#define OPTION_MEDUSA_MONITOR_OPTION_POLL       0x100
+#define OPTION_MEDUSA_MONITOR_OPTION_SIGNAL     0x101
+#define OPTION_MEDUSA_MONITOR_OPTION_TIMER      0x102
 
 static struct option longopts[] = {
-        { "help",               no_argument,            NULL,        OPTION_HELP                },
-        { "url",                required_argument,      NULL,        OPTION_URL                 },
-        { "method",             required_argument,      NULL,        OPTION_METHOD              },
-        { "header",             required_argument,      NULL,        OPTION_HEADER              },
-        { "data",               required_argument,      NULL,        OPTION_DATA                },
-        { "connect-timeout",    required_argument,      NULL,        OPTION_CONNECT_TIMEOUT     },
-        { "read-timeout",       required_argument,      NULL,        OPTION_READ_TIMEOUT        },
-        { "exit-on-request",    required_argument,      NULL,        OPTION_EXIT_ON_REQUEST     },
-        { NULL,                 0,                      NULL,        0                          },
+        { "help",                       no_argument,            NULL,        OPTION_HELP                        },
+        { "url",                        required_argument,      NULL,        OPTION_URL                         },
+        { "method",                     required_argument,      NULL,        OPTION_METHOD                      },
+        { "header",                     required_argument,      NULL,        OPTION_HEADER                      },
+        { "data",                       required_argument,      NULL,        OPTION_DATA                        },
+        { "connect-timeout",            required_argument,      NULL,        OPTION_CONNECT_TIMEOUT             },
+        { "read-timeout",               required_argument,      NULL,        OPTION_READ_TIMEOUT                },
+        { "exit-on-request",            required_argument,      NULL,        OPTION_EXIT_ON_REQUEST             },
+        { "medusa-monitor-poll",        required_argument,      NULL,        OPTION_MEDUSA_MONITOR_OPTION_POLL  },
+        { "medusa-monitor-signal",      required_argument,      NULL,        OPTION_MEDUSA_MONITOR_OPTION_SIGNAL},
+        { "medusa-monitor-timer",       required_argument,      NULL,        OPTION_MEDUSA_MONITOR_OPTION_TIMER },
+        { NULL,                         0,                      NULL,        0                                  },
 };
 
 static void usage (const char *pname)
@@ -56,6 +67,23 @@ static void usage (const char *pname)
         fprintf(stdout, "  -c, --connect-timeout: connect timeout (default: %.2f)\n", OPTIONS_DEFAULT_CONNECT_TIMEOUT);
         fprintf(stdout, "  -r, --read-timeout   : read timeout (default: %.2f)\n", OPTIONS_DEFAULT_READ_TIMEOUT);
         fprintf(stdout, "  -R, --exit-on-request: exit on request (default: %d)\n", OPTIONS_DEFAULT_EXIT_ON_REQUEST);
+        fprintf(stdout, "\n");
+        fprintf(stdout, "      --medusa-monitor-poll  : medusa monitor poll type (default: %d)\n", OPTIONS_DEFAULT_MEDUSA_MONITOR_POLL);
+        fprintf(stdout, "                               default  : MEDUSA_MONITOR_POLL_DEFAULT\n");
+        fprintf(stdout, "                               epoll    : MEDUSA_MONITOR_POLL_EPOLL\n");
+        fprintf(stdout, "                               kqueue   : MEDUSA_MONITOR_POLL_KQUEUE\n");
+        fprintf(stdout, "                               poll     : MEDUSA_MONITOR_POLL_POLL\n");
+        fprintf(stdout, "                               select   : MEDUSA_MONITOR_POLL_SELECT\n");
+        fprintf(stdout, "                               wsapoll  : MEDUSA_MONITOR_POLL_WSAPOLL\n");
+        fprintf(stdout, "      --medusa-monitor-signal: medusa monitor signal type (default: %d)\n", OPTIONS_DEFAULT_MEDUSA_MONITOR_SIGNAL);
+        fprintf(stdout, "                               default  : MEDUSA_MONITOR_SIGNAL_DEFAULT\n");
+        fprintf(stdout, "                               sigaction: MEDUSA_MONITOR_SIGNAL_SIGACTION\n");
+        fprintf(stdout, "                               null     : MEDUSA_MONITOR_SIGNAL_NULL\n");
+        fprintf(stdout, "      --medusa-monitor-timer : medusa monitor timer type (default: %d)\n", OPTIONS_DEFAULT_MEDUSA_MONITOR_TIMER);
+        fprintf(stdout, "                               default  : MEDUSA_MONITOR_TIMER_DEFAULT\n");
+        fprintf(stdout, "                               timerfd  : MEDUSA_MONITOR_TIMER_TIMERFD\n");
+        fprintf(stdout, "                               monotonic: MEDUSA_MONITOR_TIMER_MONOTONIC\n");
+        fprintf(stdout, "\n");
         fprintf(stdout, "  -h, --help  : this text\n");
         fprintf(stdout, "\n");
         fprintf(stdout, "example:\n");
@@ -223,7 +251,12 @@ int main (int argc, char *argv[])
         double option_connect_timeout;
         double option_read_timeout;
 
+        int option_medusa_monitor_poll;
+        int option_medusa_monitor_signal;
+        int option_medusa_monitor_timer;
+
         int rc;
+        struct medusa_monitor_init_options monitor_init_options;
         struct medusa_monitor *monitor;
 
         struct medusa_httprequest_init_options httprequest_init_options;
@@ -246,6 +279,10 @@ int main (int argc, char *argv[])
         option_connect_timeout = OPTIONS_DEFAULT_CONNECT_TIMEOUT;
         option_read_timeout    = OPTIONS_DEFAULT_READ_TIMEOUT;
         option_exit_on_request = OPTIONS_DEFAULT_EXIT_ON_REQUEST;
+
+        option_medusa_monitor_poll   = OPTIONS_DEFAULT_MEDUSA_MONITOR_POLL;
+        option_medusa_monitor_signal = OPTIONS_DEFAULT_MEDUSA_MONITOR_SIGNAL;
+        option_medusa_monitor_timer  = OPTIONS_DEFAULT_MEDUSA_MONITOR_TIMER;
 
         _argv = malloc(sizeof(char *) * (argc + 1));
 
@@ -280,6 +317,29 @@ int main (int argc, char *argv[])
                         case OPTION_EXIT_ON_REQUEST:
                                 option_exit_on_request = !!atoi(optarg);
                                 break;
+
+                        case OPTION_MEDUSA_MONITOR_OPTION_POLL:
+                                option_medusa_monitor_poll = medusa_monitor_poll_type_value(optarg);
+                                if (option_medusa_monitor_poll < 0) {
+                                        fprintf(stderr, "invalid medusa monitor poll type: %s\n", optarg);
+                                        goto bail;
+                                }
+                                break;
+                        case OPTION_MEDUSA_MONITOR_OPTION_SIGNAL:
+                                option_medusa_monitor_signal = medusa_monitor_signal_type_value(optarg);
+                                if (option_medusa_monitor_signal < 0) {
+                                        fprintf(stderr, "invalid medusa monitor signal type: %s\n", optarg);
+                                        goto bail;
+                                }
+                                break;
+                        case OPTION_MEDUSA_MONITOR_OPTION_TIMER:
+                                option_medusa_monitor_timer = medusa_monitor_timer_type_value(optarg);
+                                if (option_medusa_monitor_timer < 0) {
+                                        fprintf(stderr, "invalid medusa monitor timer type: %s\n", optarg);
+                                        goto bail;
+                                }
+                                break;
+
                         default:
                                 fprintf(stderr, "invalid option: %s\n", argv[optind - 1]);
                                 goto bail;
@@ -295,14 +355,28 @@ int main (int argc, char *argv[])
         }
 
         http_request_context.exit_on_request = option_exit_on_request;
-        fprintf(stderr, "url            : %s\n", option_url);
-        fprintf(stderr, "method         : %s\n", option_method);
-        fprintf(stderr, "data           : %s\n", (option_data) ? option_data : "(null)");
-        fprintf(stderr, "connect timeout: %.2f\n", option_connect_timeout);
-        fprintf(stderr, "read timeout   : %.2f\n", option_read_timeout);
-        fprintf(stderr, "exit on request: %d\n", option_exit_on_request);
 
-        monitor = medusa_monitor_create_with_options(NULL);
+        fprintf(stderr, "options:\n");
+        fprintf(stderr, "  url                  : %s\n", option_url);
+        fprintf(stderr, "  method               : %s\n", option_method);
+        fprintf(stderr, "  data                 : %s\n", (option_data) ? option_data : "(null)");
+        fprintf(stderr, "  connect timeout      : %.2f\n", option_connect_timeout);
+        fprintf(stderr, "  read timeout         : %.2f\n", option_read_timeout);
+        fprintf(stderr, "  exit on request      : %d\n", option_exit_on_request);
+        fprintf(stderr, "\n");
+        fprintf(stderr, "  medusa monitor poll  : %d, %s\n", option_medusa_monitor_poll, medusa_monitor_poll_type_string(option_medusa_monitor_poll));
+        fprintf(stderr, "  medusa monitor signal: %d, %s\n", option_medusa_monitor_signal, medusa_monitor_signal_type_string(option_medusa_monitor_signal));
+        fprintf(stderr, "  medusa monitor timer : %d, %s\n", option_medusa_monitor_timer, medusa_monitor_timer_type_string(option_medusa_monitor_timer));
+        fprintf(stderr, "\n");
+
+        medusa_monitor_init_options_default(&monitor_init_options);
+        monitor_init_options.flags              = MEDUSA_MONITOR_FLAG_NONE;
+        monitor_init_options.onevent.callback   = NULL;
+        monitor_init_options.onevent.context    = NULL;
+        monitor_init_options.poll.type          = option_medusa_monitor_poll;
+        monitor_init_options.signal.type        = option_medusa_monitor_signal;
+        monitor_init_options.timer.type         = option_medusa_monitor_timer;
+        monitor = medusa_monitor_create_with_options(&monitor_init_options);
         if (monitor == NULL) {
                 fprintf(stderr, "can not create monitor\n");
                 goto bail;
