@@ -5,6 +5,18 @@
 #include "medusa/error.h"
 #include "medusa/exec.h"
 
+#if !defined(__LINUX__)
+
+int main (int argc, char *argv[])
+{
+        (void) argc;
+        (void) argv;
+        fprintf(stderr, "not supported\n");
+        return 0;
+}
+
+#else
+
 int main (int argc, char *argv[])
 {
         struct medusa_exec *exec;
@@ -18,3 +30,5 @@ int main (int argc, char *argv[])
         fprintf(stderr, "success\n");
         return 0;
 }
+
+#endif

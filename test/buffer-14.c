@@ -55,13 +55,13 @@ static int test_buffer (unsigned int type)
                         goto bail;
                 }
         }
-        fprintf(stderr, "buffer size: %ld, length: %ld\n", medusa_buffer_get_size(buffer), medusa_buffer_get_length(buffer));
+        fprintf(stderr, "buffer size: %ld, length: %ld\n", (long) medusa_buffer_get_size(buffer), (long) medusa_buffer_get_length(buffer));
 
         rc = medusa_buffer_shrink(buffer, medusa_buffer_get_length(buffer));
         if (rc < 0) {
                 goto bail;
         }
-        fprintf(stderr, "buffer size: %ld, length: %ld\n", medusa_buffer_get_size(buffer), medusa_buffer_get_length(buffer));
+        fprintf(stderr, "buffer size: %ld, length: %ld\n", (long) medusa_buffer_get_size(buffer), (long) medusa_buffer_get_length(buffer));
 
         for (i = 0; i < rand() % 100000; i++) {
                 rc = medusa_buffer_choke(buffer, 0, rand() % (medusa_buffer_get_length(buffer) / 2));
@@ -69,13 +69,13 @@ static int test_buffer (unsigned int type)
                         goto bail;
                 }
         }
-        fprintf(stderr, "buffer size: %ld, length: %ld\n", medusa_buffer_get_size(buffer), medusa_buffer_get_length(buffer));
+        fprintf(stderr, "buffer size: %ld, length: %ld\n", (long) medusa_buffer_get_size(buffer), (long) medusa_buffer_get_length(buffer));
 
         rc = medusa_buffer_shrink(buffer, medusa_buffer_get_length(buffer));
         if (rc < 0) {
                 goto bail;
         }
-        fprintf(stderr, "buffer size: %ld, length: %ld\n", medusa_buffer_get_size(buffer), medusa_buffer_get_length(buffer));
+        fprintf(stderr, "buffer size: %ld, length: %ld\n", (long) medusa_buffer_get_size(buffer), (long) medusa_buffer_get_length(buffer));
 
         medusa_buffer_destroy(buffer);
         if (bevents != (MEDUSA_BUFFER_EVENT_WRITE |

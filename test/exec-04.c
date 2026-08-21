@@ -11,6 +11,18 @@
 #include "medusa/exec.h"
 #include "medusa/monitor.h"
 
+#if !defined(__LINUX__)
+
+int main (int argc, char *argv[])
+{
+        (void) argc;
+        (void) argv;
+        fprintf(stderr, "not supported\n");
+        return 0;
+}
+
+#else
+
 static const unsigned int g_polls[] = {
         MEDUSA_MONITOR_POLL_DEFAULT,
 #if defined(__LINUX__)
@@ -128,3 +140,5 @@ int main (int argc, char *argv[])
         }
         return 0;
 }
+
+#endif

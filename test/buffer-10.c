@@ -76,13 +76,13 @@ static int test_buffer (unsigned int type, unsigned int count)
 
         offset = medusa_buffer_memmem(buffer, 0, adata, strlen(adata));
         if (offset != (int64_t) strlen(pdata)) {
-                fprintf(stderr, "medusa_buffer_memmem failed: %ld != %ld\n", offset, strlen(pdata));
+                fprintf(stderr, "medusa_buffer_memmem failed: %ld != %ld\n", (long) offset, strlen(pdata));
                 return -1;
         }
 
         offset = medusa_buffer_memmem(buffer, 0, pdata, strlen(pdata));
         if (offset != 0) {
-                fprintf(stderr, "medusa_buffer_memmem failed: %ld != %d.\n", offset, 0);
+                fprintf(stderr, "medusa_buffer_memmem failed: %ld != %d.\n", (long) offset, 0);
                 return -1;
         }
 
