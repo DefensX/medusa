@@ -3,7 +3,12 @@
 1. <a href="#1-overview">overview</a>
 2. <a href="#2-download">download</a>
 3. <a href="#3-build">build</a>
-3. <a href="#4-benchmark">benchmark</a>
+    1. <a href="#31-debian">debian</a>
+    2. <a href="#32-mingw">mingw</a>
+        1. <a href="#321-openssl">openssl</a>
+        2. <a href="#322-medusa">medusa</a>
+    3. <a href="#33-darwin">darwin</a>
+4. <a href="#4-benchmark">benchmark</a>
 
 ## 1. overview ##
 
@@ -59,7 +64,7 @@ or
     make -j 8 DESTDIR=../../install_mingw64 install_sw
     cd ../../..
 
-#### 3.3.3. medusa
+#### 3.2.2. medusa
 
     CFLAGS="-DWINVER=_WIN32_WINNT_WIN10 -D_WIN32_WINNT=_WIN32_WINNT_WIN10 -I`pwd`/3rdparty/install_mingw64/usr/local/include" \
 	LDFLAGS="-L`pwd`/3rdparty/install_mingw64/usr/local/lib" \
