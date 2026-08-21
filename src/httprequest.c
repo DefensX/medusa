@@ -381,9 +381,21 @@ static int httprequest_httpparser_on_status (http_parser *http_parser, const cha
 {
         struct medusa_httprequest *httprequest = http_parser->data;
         httprequest->reply->status.code = http_parser->status_code;
-        httprequest->reply->status.value = medusa_strndup(at, length);
-        if (httprequest->reply->status.value == NULL) {
-                return -ENOMEM;
+        if (length == 0) {
+                return 0;
+        }
+        if (httprequest->reply->status.value != NULL) {
+                char *tmp = realloc(httprequest->reply->status.value, strlen(httprequest->reply->status.value) + length + 1);
+                if (tmp == NULL) {
+                        return -ENOMEM;
+                }
+                httprequest->reply->status.value = tmp;
+                strncat(httprequest->reply->status.value, at, length);
+        } else {
+                httprequest->reply->status.value = medusa_strndup(at, length);
+                if (httprequest->reply->status.value == NULL) {
+                        return -ENOMEM;
+                }
         }
         return 0;
 }
