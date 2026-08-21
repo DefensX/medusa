@@ -36,12 +36,14 @@ or
     apt install pkg-config
 
     cd medusa
+    MEDUSA_BUILD_EXAMPLES=y \
+    MEDUSA_BUILD_TESTS=y \
     make -j 8
     make -j 8 tests
 
 ### 3.2. mingw ###
 
-#### 3.2.1 openssl
+#### 3.2.1. openssl
 
     OPENSSL=openssl-3.5.7
 
@@ -57,11 +59,35 @@ or
     make -j 8 DESTDIR=../../install_mingw64 install_sw
     cd ../../..
 
+#### 3.3.3. medusa
+
     CFLAGS="-DWINVER=_WIN32_WINNT_WIN10 -D_WIN32_WINNT=_WIN32_WINNT_WIN10 -I`pwd`/3rdparty/install_mingw64/usr/local/include" \
 	LDFLAGS="-L`pwd`/3rdparty/install_mingw64/usr/local/lib" \
     MEDUSA_BUILD_EXAMPLES=y \
     MEDUSA_BUILD_TESTS=y \
     CROSS_COMPILE_PREFIX=x86_64-w64-mingw32- \
+    make -j 8
+
+### 3.3. darwin
+
+    OPENSSL=openssl-3.5.7
+
+    mkdir -p 3rdparty/openssl-darwin64
+    curl -L https://www.openssl.org/source/$OPENSSL.tar.gz | tar -xz -C 3rdparty/openssl-darwin64
+
+    cd 3rdparty/openssl-darwin64/$OPENSSL
+    CC= ./Configure \
+        --prefix=/usr/local --libdir=lib \
+        no-apps no-idea no-mdc2 no-rc5 no-shared no-tests
+    make -j 8 build_libs
+    make -j 8 DESTDIR=../../install_darwin64 install_sw
+    cd ../../..
+
+    CFLAGS="-I`pwd`/3rdparty/install_darwin64/usr/local/include" \
+	LDFLAGS="-L`pwd`/3rdparty/install_darwin64/usr/local/lib" \
+    MEDUSA_BUILD_EXAMPLES=y \
+    MEDUSA_BUILD_TESTS=y \
+    MEDUSA_LIBMEDUSA_TARGET_SO=n \
     make -j 8
 
 ## 4. benchmark
