@@ -848,6 +848,17 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
         monitor = medusa_io_get_monitor(io);
         medusa_monitor_lock(monitor);
 
+        /* hup is reported whether or not it was requested, so it can arrive
+         * while read interest is disabled. run the read path anyway, so any
+         * pending data is drained and the disconnect is classified by read()
+         * rather than being guessed from the hup alone. */
+        if ((events & MEDUSA_IO_EVENT_HUP) &&
+            !(events & MEDUSA_IO_EVENT_IN) &&
+            ((tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTING) ||
+             (tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTED))) {
+                events |= MEDUSA_IO_EVENT_IN;
+        }
+
         if (events & MEDUSA_IO_EVENT_OUT) {
                 if (tcpsocket->state == MEDUSA_TCPSOCKET_STATE_DISCONNECTED) {
                 } else if (tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTING) {
@@ -1423,9 +1434,17 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
         }
         if (events & MEDUSA_IO_EVENT_ERR) {
                 if (tcpsocket->state != MEDUSA_TCPSOCKET_STATE_ERROR) {
+                        int valopt;
+                        socklen_t vallen;
                         struct medusa_tcpsocket_event_error medusa_tcpsocket_event_error;
+                        valopt = 0;
+                        vallen = sizeof(valopt);
+                        rc = getsockopt(medusa_io_get_fd_unlocked(io), SOL_SOCKET, SO_ERROR, (void *) &valopt, &vallen);
+                        if (rc < 0 || valopt == 0) {
+                                valopt = EIO;
+                        }
                         medusa_tcpsocket_event_error.state = tcpsocket->state;
-                        medusa_tcpsocket_event_error.error = EIO;
+                        medusa_tcpsocket_event_error.error = valopt;
                         medusa_tcpsocket_event_error.line  = __LINE__;
                         rc = tcpsocket_set_state(tcpsocket, MEDUSA_TCPSOCKET_STATE_ERROR, medusa_tcpsocket_event_error.error, __LINE__);
                         if (rc < 0) {
@@ -1439,21 +1458,47 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                         }
                 }
         }
+        /* hup means both directions are torn down, which a graceful close
+         * reaches just as much as a reset does. only act on it if the read
+         * path above has not already settled the socket, and let SO_ERROR
+         * decide whether this is a disconnect or an error. */
         if (events & MEDUSA_IO_EVENT_HUP) {
-                if (tcpsocket->state != MEDUSA_TCPSOCKET_STATE_ERROR) {
-                        struct medusa_tcpsocket_event_error medusa_tcpsocket_event_error;
-                        medusa_tcpsocket_event_error.state = tcpsocket->state;
-                        medusa_tcpsocket_event_error.error = ECONNRESET;
-                        medusa_tcpsocket_event_error.line  = __LINE__;
-                        rc = tcpsocket_set_state(tcpsocket, MEDUSA_TCPSOCKET_STATE_ERROR, medusa_tcpsocket_event_error.error, __LINE__);
+                if ((tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTING) ||
+                    (tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTED)) {
+                        int valopt;
+                        socklen_t vallen;
+                        valopt = 0;
+                        vallen = sizeof(valopt);
+                        rc = getsockopt(medusa_io_get_fd_unlocked(io), SOL_SOCKET, SO_ERROR, (void *) &valopt, &vallen);
                         if (rc < 0) {
-                                medusa_errorf("tcpsocket_set_state failed, rc: %d", rc);
-                                goto bail;
+                                valopt = 0;
                         }
-                        rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_ERROR, &medusa_tcpsocket_event_error);
-                        if (rc < 0) {
-                                medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
-                                goto bail;
+                        if (valopt == 0) {
+                                rc = tcpsocket_set_state(tcpsocket, MEDUSA_TCPSOCKET_STATE_DISCONNECTED, 0, __LINE__);
+                                if (rc < 0) {
+                                        medusa_errorf("tcpsocket_set_state failed, rc: %d", rc);
+                                        goto bail;
+                                }
+                                rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_DISCONNECTED, NULL);
+                                if (rc < 0) {
+                                        medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
+                                        goto bail;
+                                }
+                        } else {
+                                struct medusa_tcpsocket_event_error medusa_tcpsocket_event_error;
+                                medusa_tcpsocket_event_error.state = tcpsocket->state;
+                                medusa_tcpsocket_event_error.error = valopt;
+                                medusa_tcpsocket_event_error.line  = __LINE__;
+                                rc = tcpsocket_set_state(tcpsocket, MEDUSA_TCPSOCKET_STATE_ERROR, medusa_tcpsocket_event_error.error, __LINE__);
+                                if (rc < 0) {
+                                        medusa_errorf("tcpsocket_set_state failed, rc: %d", rc);
+                                        goto bail;
+                                }
+                                rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_ERROR, &medusa_tcpsocket_event_error);
+                                if (rc < 0) {
+                                        medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
+                                        goto bail;
+                                }
                         }
                 }
         }
