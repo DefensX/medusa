@@ -578,9 +578,17 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                         goto bail;
                 }
         } else if (events & MEDUSA_IO_EVENT_ERR) {
+                int valopt;
+                socklen_t vallen;
                 struct medusa_udpsocket_event_error medusa_udpsocket_event_error;
+                valopt = 0;
+                vallen = sizeof(valopt);
+                rc = getsockopt(medusa_io_get_fd_unlocked(io), SOL_SOCKET, SO_ERROR, (void *) &valopt, &vallen);
+                if (rc < 0 || valopt == 0) {
+                        valopt = EIO;
+                }
                 medusa_udpsocket_event_error.state = udpsocket->state;
-                medusa_udpsocket_event_error.error = EIO;
+                medusa_udpsocket_event_error.error = valopt;
                 medusa_udpsocket_event_error.line  = __LINE__;
                 rc = udpsocket_set_state(udpsocket, MEDUSA_UDPSOCKET_STATE_ERROR, medusa_udpsocket_event_error.error);
                 if (rc < 0) {
@@ -593,9 +601,17 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                         goto bail;
                 }
         } else if (events & MEDUSA_IO_EVENT_HUP) {
+                int valopt;
+                socklen_t vallen;
                 struct medusa_udpsocket_event_error medusa_udpsocket_event_error;
+                valopt = 0;
+                vallen = sizeof(valopt);
+                rc = getsockopt(medusa_io_get_fd_unlocked(io), SOL_SOCKET, SO_ERROR, (void *) &valopt, &vallen);
+                if (rc < 0 || valopt == 0) {
+                        valopt = ECONNRESET;
+                }
                 medusa_udpsocket_event_error.state = udpsocket->state;
-                medusa_udpsocket_event_error.error = ECONNRESET;
+                medusa_udpsocket_event_error.error = valopt;
                 medusa_udpsocket_event_error.line  = __LINE__;
                 rc = udpsocket_set_state(udpsocket, MEDUSA_UDPSOCKET_STATE_ERROR, medusa_udpsocket_event_error.error);
                 if (rc < 0) {
