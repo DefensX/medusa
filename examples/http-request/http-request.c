@@ -421,6 +421,10 @@ int main (int argc, char *argv[])
                 switch (c) {
                         case OPTION_HEADER:
                                 rc = medusa_httprequest_add_header(httprequest, optarg, NULL);
+                                if (rc < 0) {
+                                        fprintf(stderr, "can not add header: %s\n", optarg);
+                                        goto bail;
+                                }
                                 break;
                 }
         }
