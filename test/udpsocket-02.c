@@ -23,7 +23,10 @@ static const unsigned int g_polls[] = {
         MEDUSA_MONITOR_POLL_KQUEUE,
 #endif
         MEDUSA_MONITOR_POLL_POLL,
-        MEDUSA_MONITOR_POLL_SELECT
+        MEDUSA_MONITOR_POLL_SELECT,
+#if defined(__WINDOWS__)
+        MEDUSA_MONITOR_POLL_WSAPOLL,
+#endif
 };
 
 static int udpsocket_bind_onevent (struct medusa_udpsocket *udpsocket, unsigned int events, void *context, void *param)

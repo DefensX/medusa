@@ -20,7 +20,10 @@ static const unsigned int g_polls[] = {
         MEDUSA_MONITOR_POLL_KQUEUE,
 #endif
         MEDUSA_MONITOR_POLL_POLL,
-        MEDUSA_MONITOR_POLL_SELECT
+        MEDUSA_MONITOR_POLL_SELECT,
+#if defined(__WINDOWS__)
+        MEDUSA_MONITOR_POLL_WSAPOLL,
+#endif
 };
 
 static int io_onevent (struct medusa_io *io, unsigned int events, void *context, void *param)
@@ -73,7 +76,7 @@ static int test_poll (unsigned int poll)
                 fprintf(stderr, "ievents: 0x%08x is invalid\n", ievents);
                 goto bail;
         }
-        
+
         return 0;
 bail:   if (monitor != NULL) {
                 medusa_monitor_destroy(monitor);

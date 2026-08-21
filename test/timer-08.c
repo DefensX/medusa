@@ -26,7 +26,10 @@ static const unsigned int g_polls[] = {
 #if defined(__LINUX__) || defined(__APPLE__)
         MEDUSA_MONITOR_POLL_POLL,
 #endif
-        MEDUSA_MONITOR_POLL_SELECT
+        MEDUSA_MONITOR_POLL_SELECT,
+#if defined(__WINDOWS__)
+        MEDUSA_MONITOR_POLL_WSAPOLL,
+#endif
 };
 
 static int timer_count;
