@@ -30,6 +30,9 @@ struct internal {
         WSAPOLLFD *pfds;
         int npfds;
         int spfds;
+        WSAPOLLFD *rpfds;
+        int nrpfds;
+        int srpfds;
         struct medusa_io **ios;
         int nios;
         int (*onevent) (struct medusa_poll_backend *backend, struct medusa_io *io, unsigned int events, void *context, void *param);
@@ -62,25 +65,32 @@ static int internal_add (struct medusa_poll_backend *backend, struct medusa_io *
                         if (tmp == NULL) {
                                 goto bail;
                         }
-                        memcpy(tmp, internal->pfds, sizeof(WSAPOLLFD) * internal->npfds);
+                        if (internal->npfds > 0) {
+                                memcpy(tmp, internal->pfds, sizeof(WSAPOLLFD) * internal->npfds);
+                        }
                         free(internal->pfds);
                 }
                 internal->pfds = tmp;
                 internal->spfds = internal->spfds + 64;
         }
         if (io->fd + 1 > internal->nios) {
+                int nios;
                 struct medusa_io **tmp;
-                tmp = (struct medusa_io **) realloc(internal->ios, sizeof(struct medusa_io *) * MAX(io->fd + 1, internal->nios + 64));
+                nios = MAX(io->fd + 1, internal->nios + 64);
+                tmp = (struct medusa_io **) realloc(internal->ios, sizeof(struct medusa_io *) * nios);
                 if (tmp == NULL) {
-                        tmp = (struct medusa_io **) malloc(sizeof(struct medusa_io *) * MAX(io->fd + 1, internal->nios + 64));
+                        tmp = (struct medusa_io **) malloc(sizeof(struct medusa_io *) * nios);
                         if (tmp == NULL) {
                                 goto bail;
                         }
-                        memcpy(tmp, internal->ios, sizeof(struct medusa_io **) * internal->nios);
+                        if (internal->nios > 0) {
+                                memcpy(tmp, internal->ios, sizeof(struct medusa_io *) * internal->nios);
+                        }
                         free(internal->ios);
                 }
+                memset(&tmp[internal->nios], 0, sizeof(struct medusa_io *) * (nios - internal->nios));
                 internal->ios = tmp;
-                internal->nios = MAX(io->fd + 1, internal->nios + 64);
+                internal->nios = nios;
         }
         pfd = &internal->pfds[internal->npfds];
         pfd->events = 0;
@@ -197,28 +207,50 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
         if (count < 0) {
                 goto bail;
         }
-        for (i = 0; i < internal->npfds; i++) {
+        if (internal->npfds > internal->srpfds) {
+                int srpfds;
+                WSAPOLLFD *tmp;
+                /* the ready set is rebuilt from scratch on every run, so the
+                 * old entries are not preserved on the realloc fallback path */
+                srpfds = MAX(internal->npfds, internal->srpfds + 64);
+                tmp = (WSAPOLLFD *) realloc(internal->rpfds, sizeof(WSAPOLLFD) * srpfds);
+                if (tmp == NULL) {
+                        tmp = (WSAPOLLFD *) malloc(sizeof(WSAPOLLFD) * srpfds);
+                        if (tmp == NULL) {
+                                goto bail;
+                        }
+                        free(internal->rpfds);
+                }
+                internal->rpfds = tmp;
+                internal->srpfds = srpfds;
+        }
+        internal->nrpfds = 0;
+        for (i = 0; i < internal->npfds && internal->nrpfds < internal->srpfds; i++) {
                 if (internal->pfds[i].revents == 0) {
                         continue;
                 }
+                internal->rpfds[internal->nrpfds] = internal->pfds[i];
+                internal->nrpfds += 1;
+        }
+        for (i = 0; i < internal->nrpfds; i++) {
                 /* Windows WSAPoll specific behavior for CONNECTING state:
                  * when connect() fails, WSAPoll might set POLLERR and POLLHUP instead of standard write event
                  * for connecting socket. We handle POLLERR manually if it occurs. */
 
                 events = 0;
-                if (internal->pfds[i].revents & POLLRDNORM) {
+                if (internal->rpfds[i].revents & POLLRDNORM) {
                         events |= MEDUSA_IO_EVENT_IN;
                 }
-                if (internal->pfds[i].revents & POLLWRNORM) {
+                if (internal->rpfds[i].revents & POLLWRNORM) {
                         events |= MEDUSA_IO_EVENT_OUT;
                 }
-                if (internal->pfds[i].revents & POLLRDBAND) {
+                if (internal->rpfds[i].revents & POLLRDBAND) {
                         events |= MEDUSA_IO_EVENT_PRI;
                 }
-                if (internal->pfds[i].revents & POLLHUP) {
+                if (internal->rpfds[i].revents & POLLHUP) {
                         events |= MEDUSA_IO_EVENT_HUP;
                 }
-                if (internal->pfds[i].revents & POLLERR) {
+                if (internal->rpfds[i].revents & POLLERR) {
                         /* Add OUT event if there's POLLERR so that connecting socket
                          * can capture the error through getsockopt on write event */
                         if (events == 0) {
@@ -226,10 +258,14 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
                         }
                         events |= MEDUSA_IO_EVENT_ERR;
                 }
-                if (internal->pfds[i].revents & POLLNVAL) {
+                if (internal->rpfds[i].revents & POLLNVAL) {
                         events |= MEDUSA_IO_EVENT_NVAL;
                 }
-                io = internal->ios[internal->pfds[i].fd];
+                io = internal->ios[internal->rpfds[i].fd];
+                if (io == NULL) {
+                        medusa_errorf("io fd: %d is already destroyed", (int) internal->rpfds[i].fd);
+                        continue;
+                }
                 if (events) {
                         rc = internal->onevent(backend, io, events, internal->context, NULL);
                         if (rc < 0) {
@@ -250,6 +286,9 @@ static void internal_destroy (struct medusa_poll_backend *backend)
         }
         if (internal->ios != NULL) {
                 free(internal->ios);
+        }
+        if (internal->rpfds != NULL) {
+                free(internal->rpfds);
         }
         if (internal->pfds != NULL) {
                 free(internal->pfds);

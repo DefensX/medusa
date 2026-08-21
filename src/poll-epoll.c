@@ -23,14 +23,44 @@
 #define EVENTS_STEP     (32)
 #define EVENTS_MAX      (8 * 1024)
 
+#define MAX(a, b)       (((a) > (b)) ? (a) : (b))
+
 struct internal {
         struct medusa_poll_backend backend;
         int fd;
         int maxevents;
         struct epoll_event *events;
+        struct medusa_io **ios;
+        int nios;
         int (*onevent) (struct medusa_poll_backend *backend, struct medusa_io *io, unsigned int events, void *context, void *param);
         void *context;
 };
+
+static int internal_ios_grow (struct internal *internal, int fd)
+{
+        int nios;
+        struct medusa_io **tmp;
+        if (fd + 1 <= internal->nios) {
+                return 0;
+        }
+        nios = MAX(fd + 1, internal->nios + 64);
+        tmp = (struct medusa_io **) realloc(internal->ios, sizeof(struct medusa_io *) * nios);
+        if (tmp == NULL) {
+                tmp = (struct medusa_io **) malloc(sizeof(struct medusa_io *) * nios);
+                if (tmp == NULL) {
+                        goto bail;
+                }
+                if (internal->nios > 0) {
+                        memcpy(tmp, internal->ios, sizeof(struct medusa_io *) * internal->nios);
+                }
+                free(internal->ios);
+        }
+        memset(&tmp[internal->nios], 0, sizeof(struct medusa_io *) * (nios - internal->nios));
+        internal->ios = tmp;
+        internal->nios = nios;
+        return 0;
+bail:   return -1;
+}
 
 static int internal_add (struct medusa_poll_backend *backend, struct medusa_io *io)
 {
@@ -51,6 +81,11 @@ static int internal_add (struct medusa_poll_backend *backend, struct medusa_io *
         if (events == 0) {
                 goto bail;
         }
+        rc = internal_ios_grow(internal, io->fd);
+        if (rc < 0) {
+                medusa_errorf("internal_ios_grow failed, rc: %d", rc);
+                goto bail;
+        }
         ev.events = 0;
         if (events & MEDUSA_IO_EVENT_IN) {
                 ev.events |= EPOLLIN;
@@ -61,11 +96,12 @@ static int internal_add (struct medusa_poll_backend *backend, struct medusa_io *
         if (events & MEDUSA_IO_EVENT_PRI) {
                 ev.events |= EPOLLPRI;
         }
-        ev.data.ptr = io;
+        ev.data.fd = io->fd;
         rc = epoll_ctl(internal->fd, EPOLL_CTL_ADD, io->fd, &ev);
         if (rc < 0) {
                 return -errno;
         }
+        internal->ios[io->fd] = io;
         return 0;
 bail:   return -1;
 }
@@ -89,6 +125,11 @@ static int internal_mod (struct medusa_poll_backend *backend, struct medusa_io *
         if (events == 0) {
                 goto bail;
         }
+        rc = internal_ios_grow(internal, io->fd);
+        if (rc < 0) {
+                medusa_errorf("internal_ios_grow failed, rc: %d", rc);
+                goto bail;
+        }
         ev.events = 0;
         if (events & MEDUSA_IO_EVENT_IN) {
                 ev.events |= EPOLLIN;
@@ -99,11 +140,12 @@ static int internal_mod (struct medusa_poll_backend *backend, struct medusa_io *
         if (events & MEDUSA_IO_EVENT_PRI) {
                 ev.events |= EPOLLPRI;
         }
-        ev.data.ptr = io;
+        ev.data.fd = io->fd;
         rc = epoll_ctl(internal->fd, EPOLL_CTL_MOD, io->fd, &ev);
         if (rc < 0) {
                 return -errno;
         }
+        internal->ios[io->fd] = io;
         return 0;
 bail:   return -1;
 }
@@ -123,7 +165,11 @@ static int internal_del (struct medusa_poll_backend *backend, struct medusa_io *
                 return -EBADF;
         }
         ev.events = 0;
-        ev.data.ptr = io;
+        ev.data.fd = io->fd;
+        if (io->fd < internal->nios &&
+            internal->ios[io->fd] == io) {
+                internal->ios[io->fd] = NULL;
+        }
         rc = epoll_ctl(internal->fd, EPOLL_CTL_DEL, io->fd, &ev);
         if (rc < 0) {
                 return -errno;
@@ -162,7 +208,16 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
         }
         for (i = 0; i < count; i++) {
                 ev = &internal->events[i];
-                io = (struct medusa_io *) ev->data.ptr;
+                if (ev->data.fd < 0 ||
+                    ev->data.fd >= internal->nios) {
+                        medusa_errorf("io fd: %d is invalid", ev->data.fd);
+                        continue;
+                }
+                io = internal->ios[ev->data.fd];
+                if (io == NULL) {
+                        medusa_errorf("io fd: %d is already destroyed", ev->data.fd);
+                        continue;
+                }
                 events = 0;
                 if (ev->events & EPOLLIN) {
                         events |= MEDUSA_IO_EVENT_IN;
@@ -213,6 +268,9 @@ static void internal_destroy (struct medusa_poll_backend *backend)
         }
         if (internal->events != NULL) {
                 free(internal->events);
+        }
+        if (internal->ios != NULL) {
+                free(internal->ios);
         }
         free(internal);
 }
