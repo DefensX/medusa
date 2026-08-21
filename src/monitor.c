@@ -1775,6 +1775,129 @@ __attribute__ ((visibility ("default"))) struct medusa_subject * medusa_monitor_
         return TAILQ_NEXT(subject, list);
 }
 
+__attribute__ ((visibility ("default"))) int medusa_monitor_poll_type_value (const char *value)
+{
+        if (value == NULL) {
+                return -EINVAL;
+        }
+        if (strcasecmp(value, "MEDUSA_MONITOR_POLL_DEFAULT") == 0 ||
+            strcasecmp(value, "DEFAULT") == 0) {
+                return MEDUSA_MONITOR_POLL_DEFAULT;
+        }
+        if (strcasecmp(value, "MEDUSA_MONITOR_POLL_EPOLL") == 0 ||
+            strcasecmp(value, "EPOLL") == 0) {
+                return MEDUSA_MONITOR_POLL_EPOLL;
+        }
+        if (strcasecmp(value, "MEDUSA_MONITOR_POLL_KQUEUE") == 0 ||
+            strcasecmp(value, "KQUEUE") == 0) {
+                return MEDUSA_MONITOR_POLL_KQUEUE;
+        }
+        if (strcasecmp(value, "MEDUSA_MONITOR_POLL_POLL") == 0 ||
+            strcasecmp(value, "POLL") == 0) {
+                return MEDUSA_MONITOR_POLL_POLL;
+        }
+        if (strcasecmp(value, "MEDUSA_MONITOR_POLL_SELECT") == 0 ||
+            strcasecmp(value, "SELECT") == 0) {
+                return MEDUSA_MONITOR_POLL_SELECT;
+        }
+        if (strcasecmp(value, "MEDUSA_MONITOR_POLL_WSAPOLL") == 0 ||
+            strcasecmp(value, "WSAPOLL") == 0) {
+                return MEDUSA_MONITOR_POLL_WSAPOLL;
+        }
+        return -EINVAL;
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_monitor_poll_type_string (unsigned int type)
+{
+        if (type == MEDUSA_MONITOR_POLL_DEFAULT) {
+                return "MEDUSA_MONITOR_POLL_DEFAULT";
+        }
+        if (type == MEDUSA_MONITOR_POLL_EPOLL) {
+                return "MEDUSA_MONITOR_POLL_EPOLL";
+        }
+        if (type == MEDUSA_MONITOR_POLL_KQUEUE) {
+                return "MEDUSA_MONITOR_POLL_KQUEUE";
+        }
+        if (type == MEDUSA_MONITOR_POLL_POLL) {
+                return "MEDUSA_MONITOR_POLL_POLL";
+        }
+        if (type == MEDUSA_MONITOR_POLL_SELECT) {
+                return "MEDUSA_MONITOR_POLL_SELECT";
+        }
+        if (type == MEDUSA_MONITOR_POLL_WSAPOLL) {
+                return "MEDUSA_MONITOR_POLL_WSAPOLL";
+        }
+        return "MEDUSA_MONITOR_POLL_UNKNOWN";
+}
+
+__attribute__ ((visibility ("default"))) int medusa_monitor_timer_type_value (const char *value)
+{
+        if (value == NULL) {
+                return -EINVAL;
+        }
+        if (strcasecmp(value, "MEDUSA_MONITOR_TIMER_DEFAULT") == 0 ||
+            strcasecmp(value, "DEFAULT") == 0) {
+                return MEDUSA_MONITOR_TIMER_DEFAULT;
+        }
+        if (strcasecmp(value, "MEDUSA_MONITOR_TIMER_TIMERFD") == 0 ||
+            strcasecmp(value, "TIMERFD") == 0) {
+                return MEDUSA_MONITOR_TIMER_TIMERFD;
+        }
+        if (strcasecmp(value, "MEDUSA_MONITOR_TIMER_MONOTONIC") == 0 ||
+            strcasecmp(value, "MONOTONIC") == 0) {
+                return MEDUSA_MONITOR_TIMER_MONOTONIC;
+        }
+        return -EINVAL;
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_monitor_timer_type_string (unsigned int type)
+{
+        if (type == MEDUSA_MONITOR_TIMER_DEFAULT) {
+                return "MEDUSA_MONITOR_TIMER_DEFAULT";
+        }
+        if (type == MEDUSA_MONITOR_TIMER_TIMERFD) {
+                return "MEDUSA_MONITOR_TIMER_TIMERFD";
+        }
+        if (type == MEDUSA_MONITOR_TIMER_MONOTONIC) {
+                return "MEDUSA_MONITOR_TIMER_MONOTONIC";
+        }
+        return "MEDUSA_MONITOR_TIMER_UNKNOWN";
+}
+
+__attribute__ ((visibility ("default"))) int medusa_monitor_signal_type_value (const char *value)
+{
+        if (value == NULL) {
+                return -EINVAL;
+        }
+        if (strcasecmp(value, "MEDUSA_MONITOR_SIGNAL_DEFAULT") == 0 ||
+            strcasecmp(value, "DEFAULT") == 0) {
+                return MEDUSA_MONITOR_SIGNAL_DEFAULT;
+        }
+        if (strcasecmp(value, "MEDUSA_MONITOR_SIGNAL_SIGACTION") == 0 ||
+            strcasecmp(value, "SIGACTION") == 0) {
+                return MEDUSA_MONITOR_SIGNAL_SIGACTION;
+        }
+        if (strcasecmp(value, "MEDUSA_MONITOR_SIGNAL_NULL") == 0 ||
+            strcasecmp(value, "NULL") == 0) {
+                return MEDUSA_MONITOR_SIGNAL_NULL;
+        }
+        return -EINVAL;
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_monitor_signal_type_string (unsigned int type)
+{
+        if (type == MEDUSA_MONITOR_SIGNAL_DEFAULT) {
+                return "MEDUSA_MONITOR_SIGNAL_DEFAULT";
+        }
+        if (type == MEDUSA_MONITOR_SIGNAL_SIGACTION) {
+                return "MEDUSA_MONITOR_SIGNAL_SIGACTION";
+        }
+        if (type == MEDUSA_MONITOR_SIGNAL_NULL) {
+                return "MEDUSA_MONITOR_SIGNAL_NULL";
+        }
+        return "MEDUSA_MONITOR_SIGNAL_UNKNOWN";
+}
+
 __attribute__ ((visibility ("default"))) const char * medusa_monitor_event_string (unsigned int event)
 {
         if (event == MEDUSA_MONITOR_EVENT_ERROR)        return "MEDUSA_MONITOR_EVENT_ERROR";

@@ -132,6 +132,15 @@ int medusa_monitor_get_running (struct medusa_monitor *monitor);
 int medusa_monitor_break (struct medusa_monitor *monitor);
 int medusa_monitor_continue (struct medusa_monitor *monitor);
 
+int medusa_monitor_poll_type_value (const char *value);
+const char * medusa_monitor_poll_type_string (unsigned int type);
+
+int medusa_monitor_timer_type_value (const char *value);
+const char * medusa_monitor_timer_type_string (unsigned int type);
+
+int medusa_monitor_signal_type_value (const char *value);
+const char * medusa_monitor_signal_type_string (unsigned int type);
+
 const char * medusa_monitor_event_string (unsigned int event);
 
 #ifdef __cplusplus
