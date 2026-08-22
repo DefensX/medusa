@@ -7,6 +7,7 @@
 #include <stdarg.h>
 #include <getopt.h>
 #include <signal.h>
+#include <sys/stat.h>
 
 #if defined(__WINDOWS__)
 #include <winsock2.h>
@@ -19,18 +20,21 @@
 #define OPTIONS_DEFAULT_ADDRESS                 "127.0.0.1"
 #define OPTIONS_DEFAULT_PORT                    12345
 #define OPTIONS_DEFAULT_FOLDER                  "./"
-#define OPTIONS_DEFAULT_CLIENT_READ_TIMEOUT     -1
+#define OPTIONS_DEFAULT_CLIENT_READ_TIMEOUT     0.00
+#define OPTIONS_DEFAULT_KEEP_ALIVE              0
 
-#define OPTION_HELP                     'h'
-#define OPTION_ADDRESS                  'a'
-#define OPTION_PORT                     'p'
-#define OPTIONS_FOLDER                  'f'
-#define OPTION_CLIENT_READ_TIMEOUT      'r'
+#define OPTION_HELP                             'h'
+#define OPTION_ADDRESS                          'a'
+#define OPTION_PORT                             'p'
+#define OPTION_FOLDER                           'f'
+#define OPTION_CLIENT_READ_TIMEOUT              'r'
+#define OPTION_KEEP_ALIVE                       'A'
 
-static const char *g_option_address     = OPTIONS_DEFAULT_ADDRESS;
-static int g_option_port                = OPTIONS_DEFAULT_PORT;
-static const char *g_option_folder      = OPTIONS_DEFAULT_FOLDER;
-static int g_option_client_read_timeout = OPTIONS_DEFAULT_CLIENT_READ_TIMEOUT;
+static const char *g_option_address             = OPTIONS_DEFAULT_ADDRESS;
+static int g_option_port                        = OPTIONS_DEFAULT_PORT;
+static const char *g_option_folder              = OPTIONS_DEFAULT_FOLDER;
+static double g_option_client_read_timeout      = OPTIONS_DEFAULT_CLIENT_READ_TIMEOUT;
+static int g_option_keep_alive                  = OPTIONS_DEFAULT_KEEP_ALIVE;
 
 static int g_running = 0;
 
@@ -38,8 +42,9 @@ static struct option longopts[] = {
         { "help",               no_argument,            NULL,        OPTION_HELP                },
         { "address",            required_argument,      NULL,        OPTION_ADDRESS             },
         { "port",               required_argument,      NULL,        OPTION_PORT                },
-        { "folder"             ,required_argument,      NULL,        OPTIONS_FOLDER             },
+        { "folder",             required_argument,      NULL,        OPTION_FOLDER             },
         { "client-read-timeout",required_argument,      NULL,        OPTION_CLIENT_READ_TIMEOUT },
+        { "keep-alive",         required_argument,      NULL,        OPTION_KEEP_ALIVE          },
         { NULL,                 0,                      NULL,        0                          },
 };
 
@@ -54,7 +59,8 @@ static void usage (const char *pname)
         fprintf(stdout, "  -a, --address            : address to run on (default: %s)\n", OPTIONS_DEFAULT_ADDRESS);
         fprintf(stdout, "  -p, --port               : port to run on (default: %d)\n", OPTIONS_DEFAULT_PORT);
         fprintf(stdout, "  -f, --folder             : folder to serve (default: %s)\n", OPTIONS_DEFAULT_FOLDER);
-        fprintf(stdout, "  -r, --client-read-timeout: client read timeout in milliseconds (default: %d)\n", OPTIONS_DEFAULT_CLIENT_READ_TIMEOUT);
+        fprintf(stdout, "  -r, --client-read-timeout: client read timeout floating seconds (default: %.2f)\n", OPTIONS_DEFAULT_CLIENT_READ_TIMEOUT);
+        fprintf(stdout, "  -A, --keep-alive         : force keep alive (default: %d)\n", OPTIONS_DEFAULT_KEEP_ALIVE);
         fprintf(stdout, "\n");
         fprintf(stdout, "example:\n");
         fprintf(stdout, "  %s -a 127.0.0.1 -p 12345\n", pname);
@@ -120,6 +126,7 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
 
                 if (strcasecmp(medusa_httpserver_client_request_get_method(httpserver_client_request), "GET") == 0) {
                         int rc;
+                        struct stat fs;
                         FILE *fp = NULL;
                         char *fn = NULL;
                         rc = asprintf(&fn, "%s/%s", g_option_folder, medusa_httpserver_client_request_get_path(httpserver_client_request));
@@ -128,14 +135,26 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
                                 goto bail;
                         }
                         fp = fopen(fn, "rb");
+                        if (fp != NULL) {
+                                if (fstat(fileno(fp), &fs) != 0) {
+                                        fprintf(stderr, "can not stat file: %s\n", fn);
+                                        fclose(fp);
+                                        fp = NULL;
+                                } else if (!S_ISREG(fs.st_mode)) {
+                                        fprintf(stderr, "not a regular file: %s\n", fn);
+                                        fclose(fp);
+                                        fp = NULL;
+                                }
+                        }
                         if (fp == NULL) {
                                 fprintf(stderr, "can not open file: %s\n", fn);
 
                                 rc  = medusa_httpserver_client_reply_send_start(httpserver_client);
                                 rc |= medusa_httpserver_client_reply_send_status(httpserver_client, "1.1", 404, "Not Found");
-                                rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "key", "value");
-                                rc |= medusa_httpserver_client_reply_send_headerf(httpserver_client, "Content-Length", "%d", 0);
+                                rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "Connection", (g_option_keep_alive) ? "keep-alive" : "close");
+                                rc |= medusa_httpserver_client_reply_send_headerf(httpserver_client, "Content-Length", "%d", (int) strlen("Not Found"));
                                 rc |= medusa_httpserver_client_reply_send_header(httpserver_client, NULL, NULL);
+                                rc |= medusa_httpserver_client_reply_send_bodyf(httpserver_client, "Not Found");
                                 rc |= medusa_httpserver_client_reply_send_finish(httpserver_client);
                                 if (rc != 0) {
                                         fprintf(stderr, "can not send httpserver client reply\n");
@@ -143,7 +162,9 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
                                 }
                         } else {
                                 rc  = medusa_httpserver_client_reply_send_start(httpserver_client);
-                                rc |= medusa_httpserver_client_reply_send_status(httpserver_client, "1.0", 200, "200");
+                                rc |= medusa_httpserver_client_reply_send_status(httpserver_client, "1.1", 200, "200");
+                                rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "Connection", (g_option_keep_alive) ? "keep-alive" : "close");
+                                rc |= medusa_httpserver_client_reply_send_headerf(httpserver_client, "Content-Length", "%lld", (long long int) fs.st_size);
                                 rc |= medusa_httpserver_client_reply_send_header(httpserver_client, NULL, NULL);
 
                                 while (1) {
@@ -182,7 +203,7 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
 
                         rc  = medusa_httpserver_client_reply_send_start(httpserver_client);
                         rc |= medusa_httpserver_client_reply_send_status(httpserver_client, "1.1", 200, "OK");
-                        rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "key", "value");
+                        rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "Connection", (g_option_keep_alive) ? "keep-alive" : "close");
                         rc |= medusa_httpserver_client_reply_send_headerf(httpserver_client, "Content-Length", "%d", (int) strlen("OK"));
                         rc |= medusa_httpserver_client_reply_send_header(httpserver_client, NULL, NULL);
                         rc |= medusa_httpserver_client_reply_send_bodyf(httpserver_client, "OK");
@@ -194,6 +215,7 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
                 } else {
                         rc  = medusa_httpserver_client_reply_send_start(httpserver_client);
                         rc |= medusa_httpserver_client_reply_send_status(httpserver_client, "1.1", 500, "Internal Server Error");
+                        rc |= medusa_httpserver_client_reply_send_header(httpserver_client, "Connection", (g_option_keep_alive) ? "keep-alive" : "close");
                         rc |= medusa_httpserver_client_reply_send_headerf(httpserver_client, "Content-Length", "%d", (int) strlen("Internal Server Error"));
                         rc |= medusa_httpserver_client_reply_send_header(httpserver_client, NULL, NULL);
                         rc |= medusa_httpserver_client_reply_send_bodyf(httpserver_client, "Internal Server Error");
@@ -206,7 +228,9 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
         } else if (events & MEDUSA_HTTPSERVER_CLIENT_EVENT_REQUEST_RECEIVE_TIMEOUT) {
                 medusa_httpserver_client_destroy(httpserver_client);
         } else if (events & MEDUSA_HTTPSERVER_CLIENT_EVENT_BUFFERED_WRITE_FINISHED) {
-                medusa_httpserver_client_destroy(httpserver_client);
+                if (g_option_keep_alive == 0) {
+                        medusa_httpserver_client_destroy(httpserver_client);
+                }
         }
         return 0;
 bail:   return -1;
@@ -238,10 +262,12 @@ static int httpserver_onevent (struct medusa_httpserver *httpserver, unsigned in
                         fprintf(stderr, "can not accept httpserver client\n");
                         goto bail;
                 }
-                rc = medusa_httpserver_client_set_read_timeout(httpserver_client, g_option_client_read_timeout / 1000.00);
-                if (rc != 0) {
-                        fprintf(stderr, "can not server read timeout for httpserver client\n");
-                        goto bail;
+                if (g_option_client_read_timeout > 0.0) {
+                        rc = medusa_httpserver_client_set_read_timeout(httpserver_client, g_option_client_read_timeout);
+                        if (rc != 0) {
+                                fprintf(stderr, "can not set read timeout for httpserver client\n");
+                                goto bail;
+                        }
                 }
                 rc = medusa_httpserver_client_set_enabled(httpserver_client, 1);
                 if (rc != 0) {
@@ -285,6 +311,7 @@ int main (int argc, char *argv[])
         g_option_port                = OPTIONS_DEFAULT_PORT;
         g_option_folder              = OPTIONS_DEFAULT_FOLDER;
         g_option_client_read_timeout = OPTIONS_DEFAULT_CLIENT_READ_TIMEOUT;
+        g_option_keep_alive          = OPTIONS_DEFAULT_KEEP_ALIVE;
 
         _argv = malloc(sizeof(char *) * (argc + 1));
 
@@ -292,7 +319,7 @@ int main (int argc, char *argv[])
         for (_argc = 0; _argc < argc; _argc++) {
                 _argv[_argc] = argv[_argc];
         }
-        while ((c = getopt_long(_argc, _argv, "ha:p:r:f:", longopts, NULL)) != -1) {
+        while ((c = getopt_long(_argc, _argv, "ha:p:r:f:A:", longopts, NULL)) != -1) {
                 switch (c) {
                         case OPTION_HELP:
                                 usage(argv[0]);
@@ -303,11 +330,14 @@ int main (int argc, char *argv[])
                         case OPTION_PORT:
                                 g_option_port = atoi(optarg);
                                 break;
-                        case OPTIONS_FOLDER:
+                        case OPTION_FOLDER:
                                 g_option_folder = optarg;
                                 break;
                         case OPTION_CLIENT_READ_TIMEOUT:
-                                g_option_client_read_timeout = atoi(optarg);
+                                g_option_client_read_timeout = atof(optarg);
+                                break;
+                        case OPTION_KEEP_ALIVE:
+                                g_option_keep_alive = !!atoi(optarg);
                                 break;
                         default:
                                 fprintf(stderr, "invalid option: %s\n", argv[optind - 1]);
