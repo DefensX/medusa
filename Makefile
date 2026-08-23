@@ -110,7 +110,6 @@ install: src test
 	install -m 0644 dist/include/medusa/pool.h ${DESTDIR}/${prefix}/include/medusa/pool.h
 	install -m 0644 dist/include/medusa/strndup.h ${DESTDIR}/${prefix}/include/medusa/strndup.h
 	install -m 0644 dist/include/medusa/queue.h ${DESTDIR}/${prefix}/include/medusa/queue.h
-	install -m 0644 dist/include/medusa/queue_sys.h ${DESTDIR}/${prefix}/include/medusa/queue_sys.h
 	install -m 0644 dist/include/medusa/signal.h ${DESTDIR}/${prefix}/include/medusa/signal.h
 	install -m 0644 dist/include/medusa/condition.h ${DESTDIR}/${prefix}/include/medusa/condition.h
 	install -m 0644 dist/include/medusa/tcpsocket.h ${DESTDIR}/${prefix}/include/medusa/tcpsocket.h
