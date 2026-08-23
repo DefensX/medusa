@@ -214,7 +214,6 @@ dist.include-y = \
 	websocketserver.h \
 	exec.h \
 	queue.h \
-	queue_sys.h \
 	url.h \
 	sha1.h \
 	base64.h \
