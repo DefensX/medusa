@@ -114,13 +114,13 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
 
                 httprequest_reply = medusa_httprequest_get_reply(httprequest);
                 if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply)) {
-                        fprintf(stderr, "hettprequest reply is invalid\n");
+                        fprintf(stderr, "httprequest reply is invalid\n");
                         goto bail;
                 }
 
                 httprequest_reply_status = medusa_httprequest_reply_get_status(httprequest_reply);
                 if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply_status)) {
-                        fprintf(stderr, "hettprequest reply status is invalid\n");
+                        fprintf(stderr, "httprequest reply status is invalid\n");
                         goto bail;
                 }
                 fprintf(stderr, "status:\n");
@@ -135,13 +135,13 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
 
                 httprequest_reply = medusa_httprequest_get_reply(httprequest);
                 if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply)) {
-                        fprintf(stderr, "hettprequest reply is invalid\n");
+                        fprintf(stderr, "httprequest reply is invalid\n");
                         goto bail;
                 }
 
                 httprequest_reply_status = medusa_httprequest_reply_get_status(httprequest_reply);
                 if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply_status)) {
-                        fprintf(stderr, "hettprequest reply status is invalid\n");
+                        fprintf(stderr, "httprequest reply status is invalid\n");
                         goto bail;
                 }
                 fprintf(stderr, "status:\n");
@@ -150,7 +150,7 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
 
                 httprequest_reply_headers = medusa_httprequest_reply_get_headers(httprequest_reply);
                 if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply_headers)) {
-                        fprintf(stderr, "hettprequest reply headers is invalid\n");
+                        fprintf(stderr, "httprequest reply headers is invalid\n");
                         goto bail;
                 }
                 fprintf(stderr, "headers: %lld\n", (long long int) medusa_httprequest_reply_headers_get_count(httprequest_reply_headers));
@@ -171,13 +171,13 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
 
                 httprequest_reply = medusa_httprequest_get_reply(httprequest);
                 if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply)) {
-                        fprintf(stderr, "hettprequest reply is invalid\n");
+                        fprintf(stderr, "httprequest reply is invalid\n");
                         goto bail;
                 }
 
                 httprequest_reply_status = medusa_httprequest_reply_get_status(httprequest_reply);
                 if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply_status)) {
-                        fprintf(stderr, "hettprequest reply status is invalid\n");
+                        fprintf(stderr, "httprequest reply status is invalid\n");
                         goto bail;
                 }
                 fprintf(stderr, "status:\n");
@@ -186,7 +186,7 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
 
                 httprequest_reply_headers = medusa_httprequest_reply_get_headers(httprequest_reply);
                 if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply_headers)) {
-                        fprintf(stderr, "hettprequest reply headers is invalid\n");
+                        fprintf(stderr, "httprequest reply headers is invalid\n");
                         goto bail;
                 }
                 fprintf(stderr, "headers: %lld\n", (long long int) medusa_httprequest_reply_headers_get_count(httprequest_reply_headers));
@@ -200,7 +200,7 @@ static int httprequest_onevent (struct medusa_httprequest *httprequest, unsigned
 
                 httprequest_reply_body = medusa_httprequest_reply_get_body(httprequest_reply);
                 if (MEDUSA_IS_ERR_OR_NULL(httprequest_reply_body)) {
-                        fprintf(stderr, "hettprequest reply body is invalid\n");
+                        fprintf(stderr, "httprequest reply body is invalid\n");
                         goto bail;
                 }
                 fprintf(stderr, "body\n");

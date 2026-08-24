@@ -96,7 +96,7 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
                 fprintf(stderr, "path   : %s\n", medusa_httpserver_client_request_get_path(httpserver_client_request));
                 httpserver_client_request_options = medusa_httpserver_client_request_get_options(httpserver_client_request);
                 if (MEDUSA_IS_ERR_OR_NULL(httpserver_client_request_options)) {
-                        fprintf(stderr, "hettprequest reply options is invalid\n");
+                        fprintf(stderr, "httprequest reply options is invalid\n");
                         goto bail;
                 }
                 fprintf(stderr, "options\n");
@@ -111,7 +111,7 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
 
                 httpserver_client_request_headers = medusa_httpserver_client_request_get_headers(httpserver_client_request);
                 if (MEDUSA_IS_ERR_OR_NULL(httpserver_client_request_headers)) {
-                        fprintf(stderr, "hettprequest reply headers is invalid\n");
+                        fprintf(stderr, "httprequest reply headers is invalid\n");
                         goto bail;
                 }
                 fprintf(stderr, "headers\n");
@@ -192,7 +192,7 @@ static int httpserver_client_onevent (struct medusa_httpserver_client *httpserve
                 } else if (strcasecmp(medusa_httpserver_client_request_get_method(httpserver_client_request), "POST") == 0) {
                         httpserver_client_request_body = medusa_httpserver_client_request_get_body(httpserver_client_request);
                         if (MEDUSA_IS_ERR_OR_NULL(httpserver_client_request_body)) {
-                                fprintf(stderr, "hettprequest reply body is invalid\n");
+                                fprintf(stderr, "httprequest reply body is invalid\n");
                                 goto bail;
                         }
                         fprintf(stderr, "body\n");
