@@ -1743,6 +1743,11 @@ static int udpsocket_cdefer_onevent (struct medusa_timer *timer, unsigned int ev
         (void) timer;
         (void) param;
 
+        ret      = -EIO;
+        line     = __LINE__;
+        result   = NULL;
+        udpsocket_addrinfo = NULL;
+
         if ((events & MEDUSA_TIMER_EVENT_TIMEOUT) == 0) {
                 return 0;
         }
@@ -1752,12 +1757,14 @@ static int udpsocket_cdefer_onevent (struct medusa_timer *timer, unsigned int ev
 
         medusa_monitor_lock(monitor);
 
-        ret      = -EIO;
-        line     = __LINE__;
-        result   = NULL;
+
+        if (!medusa_subject_is_active(&udpsocket->subject) ||
+            udpsocket->state != MEDUSA_UDPSOCKET_STATE_RESOLVING) {
+                goto out;
+        }
+
         protocol = udpsocket->coptions->protocol;
         address  = udpsocket->coptions->address;
-        udpsocket_addrinfo = NULL;
 
         memset(&hints, 0, sizeof(struct addrinfo));
         if (protocol == MEDUSA_UDPSOCKET_PROTOCOL_IPV4) {
@@ -1796,8 +1803,12 @@ static int udpsocket_cdefer_onevent (struct medusa_timer *timer, unsigned int ev
                 goto error;
         }
 
-        udpsocket_addrinfo_destroy(udpsocket_addrinfo);
-        freeaddrinfo(result);
+out:    if (udpsocket_addrinfo != NULL) {
+                udpsocket_addrinfo_destroy(udpsocket_addrinfo);
+        }
+        if (result != NULL) {
+                freeaddrinfo(result);
+        }
         medusa_monitor_unlock(monitor);
         return 0;
 error:  {

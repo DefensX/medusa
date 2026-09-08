@@ -2915,6 +2915,11 @@ static int tcpsocket_cdefer_onevent (struct medusa_timer *timer, unsigned int ev
         (void) timer;
         (void) param;
 
+        ret      = -EIO;
+        line     = __LINE__;
+        result   = NULL;
+        tcpsocket_addrinfo = NULL;
+
         if ((events & MEDUSA_TIMER_EVENT_TIMEOUT) == 0) {
                 return 0;
         }
@@ -2924,12 +2929,13 @@ static int tcpsocket_cdefer_onevent (struct medusa_timer *timer, unsigned int ev
 
         medusa_monitor_lock(monitor);
 
-        ret      = -EIO;
-        line     = __LINE__;
-        result   = NULL;
+        if (!medusa_subject_is_active(&tcpsocket->subject) ||
+            tcpsocket->state != MEDUSA_TCPSOCKET_STATE_RESOLVING) {
+                goto out;
+        }
+
         protocol = tcpsocket->coptions->protocol;
         address  = tcpsocket->coptions->address;
-        tcpsocket_addrinfo = NULL;
 
         memset(&hints, 0, sizeof(struct addrinfo));
         if (protocol == MEDUSA_TCPSOCKET_PROTOCOL_IPV4) {
@@ -2968,8 +2974,12 @@ static int tcpsocket_cdefer_onevent (struct medusa_timer *timer, unsigned int ev
                 goto error;
         }
 
-        tcpsocket_addrinfo_destroy(tcpsocket_addrinfo);
-        freeaddrinfo(result);
+out:    if (tcpsocket_addrinfo != NULL) {
+                tcpsocket_addrinfo_destroy(tcpsocket_addrinfo);
+        }
+        if (result != NULL) {
+                freeaddrinfo(result);
+        }
         medusa_monitor_unlock(monitor);
         return 0;
 error:  {
