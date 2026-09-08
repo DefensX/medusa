@@ -97,6 +97,7 @@ enum {
 
 struct medusa_websocketclient_connect_options {
         struct medusa_monitor *monitor;
+        struct medusa_dnsresolver *dnsresolver;
         unsigned int protocol;
         const char *address;
         unsigned short port;

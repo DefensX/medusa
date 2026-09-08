@@ -11,6 +11,7 @@ struct medusa_udpsocket {
         unsigned int error;
         struct medusa_io *io;
         struct medusa_udpsocket_connect_options *coptions;
+        struct medusa_timer *cdefer;
         struct medusa_dnsresolver_lookup *clookup;
         struct medusa_timer *ltimer;
         struct medusa_timer *rtimer;

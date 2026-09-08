@@ -12,6 +12,7 @@ struct medusa_tcpsocket {
         int backlog;
         struct medusa_io *io;
         struct medusa_tcpsocket_connect_options *coptions;
+        struct medusa_timer *cdefer;
         struct medusa_dnsresolver_lookup *clookup;
         struct medusa_timer *ltimer;
         struct medusa_timer *ctimer;

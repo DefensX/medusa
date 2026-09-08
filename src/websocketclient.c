@@ -992,6 +992,7 @@ __attribute__ ((visibility ("default"))) struct medusa_websocketclient * medusa_
                 goto bail;
         }
         medusa_tcpsocket_connect_options.monitor                = options->monitor;
+        medusa_tcpsocket_connect_options.dnsresolver            = options->dnsresolver;
         medusa_tcpsocket_connect_options.port                   = options->port;
         medusa_tcpsocket_connect_options.protocol               = (options->protocol == MEDUSA_WEBSOCKETCLIENT_PROTOCOL_IPV4) ? MEDUSA_TCPSOCKET_PROTOCOL_IPV4 :
                                                                   (options->protocol == MEDUSA_WEBSOCKETCLIENT_PROTOCOL_IPV6) ? MEDUSA_TCPSOCKET_PROTOCOL_IPV6 :

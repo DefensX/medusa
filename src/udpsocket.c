@@ -1244,6 +1244,7 @@ static struct medusa_udpsocket_connect_options * medusa_udpsocket_connect_option
         }
         options->sport           = source->sport;
         options->resolve_timeout = source->resolve_timeout;
+        options->read_timeout    = source->read_timeout;
         options->fd              = source->fd;
         options->clodestroy      = source->clodestroy;
         options->reuseaddr       = source->reuseaddr;
@@ -1724,6 +1725,100 @@ error:  {
         return 0;
 }
 
+static int udpsocket_cdefer_onevent (struct medusa_timer *timer, unsigned int events, void *context, void *param)
+{
+        int rc;
+        int ret;
+        int line;
+        unsigned int protocol;
+        const char *address;
+
+        struct addrinfo hints;
+        struct addrinfo *result;
+        struct udpsocket_addrinfo *udpsocket_addrinfo;
+
+        struct medusa_udpsocket *udpsocket;
+        struct medusa_monitor *monitor;
+
+        (void) timer;
+        (void) param;
+
+        if ((events & MEDUSA_TIMER_EVENT_TIMEOUT) == 0) {
+                return 0;
+        }
+
+        udpsocket = context;
+        monitor = medusa_udpsocket_get_monitor(udpsocket);
+
+        medusa_monitor_lock(monitor);
+
+        ret      = -EIO;
+        line     = __LINE__;
+        result   = NULL;
+        protocol = udpsocket->coptions->protocol;
+        address  = udpsocket->coptions->address;
+        udpsocket_addrinfo = NULL;
+
+        memset(&hints, 0, sizeof(struct addrinfo));
+        if (protocol == MEDUSA_UDPSOCKET_PROTOCOL_IPV4) {
+                hints.ai_family = AF_INET;
+                hints.ai_socktype = SOCK_DGRAM;
+        } else if (protocol == MEDUSA_UDPSOCKET_PROTOCOL_IPV6) {
+                hints.ai_family = AF_INET6;
+                hints.ai_socktype = SOCK_DGRAM;
+        } else {
+                hints.ai_family = AF_UNSPEC;
+                hints.ai_socktype = SOCK_DGRAM;
+        }
+
+        rc = getaddrinfo(address, NULL, &hints, &result);
+        if (rc != 0) {
+                if (rc == EAI_NONAME) {
+                        ret = -ENOENT;
+                } else if (rc == EAI_AGAIN) {
+                        ret = -EAGAIN;
+                } else {
+                        ret = -EIO;
+                }
+                line = __LINE__;
+                goto error;
+        }
+        udpsocket_addrinfo = udpsocket_addrinfo_create_from_addrinfo(result);
+        if (udpsocket_addrinfo == NULL) {
+                ret = -ENOMEM;
+                line = __LINE__;
+                goto error;
+        }
+        rc = medusa_udpsocket_connect_resolved(udpsocket, udpsocket->coptions, udpsocket_addrinfo);
+        if (rc < 0) {
+                ret = rc;
+                line = __LINE__;
+                goto error;
+        }
+
+        udpsocket_addrinfo_destroy(udpsocket_addrinfo);
+        freeaddrinfo(result);
+        medusa_monitor_unlock(monitor);
+        return 0;
+error:  {
+
+                struct medusa_udpsocket_event_error medusa_udpsocket_event_error;
+                medusa_udpsocket_event_error.state = udpsocket->state;
+                medusa_udpsocket_event_error.error = -ret;
+                medusa_udpsocket_event_error.line  = line;
+                udpsocket_set_state(udpsocket, MEDUSA_UDPSOCKET_STATE_ERROR, medusa_udpsocket_event_error.error);
+                medusa_udpsocket_onevent_unlocked(udpsocket, MEDUSA_UDPSOCKET_EVENT_ERROR, &medusa_udpsocket_event_error);
+        }
+        if (udpsocket_addrinfo != NULL) {
+                udpsocket_addrinfo_destroy(udpsocket_addrinfo);
+        }
+        if (result != NULL) {
+                freeaddrinfo(result);
+        }
+        medusa_monitor_unlock(monitor);
+        return 0;
+}
+
 __attribute__ ((visibility ("default"))) struct medusa_udpsocket * medusa_udpsocket_connect_with_options_unlocked (const struct medusa_udpsocket_connect_options *options)
 {
         int rc;
@@ -1736,13 +1831,11 @@ __attribute__ ((visibility ("default"))) struct medusa_udpsocket * medusa_udpsoc
         unsigned short port;
 
         struct medusa_udpsocket *udpsocket;
-        struct udpsocket_addrinfo *udpsocket_addrinfo;
 
         ret = -EIO;
         line = __LINE__;
 
         udpsocket = NULL;
-        udpsocket_addrinfo = NULL;
 
         if (MEDUSA_IS_ERR_OR_NULL(options)) {
                 ret = -EINVAL;
@@ -1873,61 +1966,50 @@ ipv6:
                 }
         }
 
+        udpsocket->coptions = medusa_udpsocket_connect_options_duplicate(options);
+        if (MEDUSA_IS_ERR_OR_NULL(udpsocket->coptions)) {
+                ret = MEDUSA_PTR_ERR(udpsocket->coptions);
+                line = __LINE__;
+                goto bail;
+        }
+        if (options->address != address) {
+                if (udpsocket->coptions->address != NULL) {
+                        free((char *) udpsocket->coptions->address);
+                }
+                udpsocket->coptions->address = strdup(address);
+                if (udpsocket->coptions->address == NULL) {
+                        ret = -1;
+                        line = __LINE__;
+                        goto bail;
+                }
+        }
+
         if (resolve == 0 ||
             MEDUSA_IS_ERR_OR_NULL(options->dnsresolver) ||
             medusa_dnsresolver_get_enabled_unlocked(options->dnsresolver) != 1) {
-                struct addrinfo hints;
-                struct addrinfo *result;
-
-                result = NULL;
-
-                memset(&hints, 0, sizeof(struct addrinfo));
-                if (protocol == MEDUSA_UDPSOCKET_PROTOCOL_IPV4) {
-                        hints.ai_family = AF_INET;
-                        hints.ai_socktype = SOCK_DGRAM;
-                } else if (protocol == MEDUSA_UDPSOCKET_PROTOCOL_IPV6) {
-                        hints.ai_family = AF_INET6;
-                        hints.ai_socktype = SOCK_DGRAM;
-                } else {
-                        hints.ai_family = AF_UNSPEC;
-                        hints.ai_socktype = SOCK_DGRAM;
-                }
-
-                rc = getaddrinfo(address, NULL, &hints, &result);
-                if (rc != 0) {
-                        if (rc == EAI_NONAME) {
-                                ret = -ENOENT;
-                        } else if (rc == EAI_AGAIN) {
-                                ret = -EAGAIN;
-                        } else {
-                                ret = -EIO;
-                        }
-                        line = __LINE__;
-                        goto bail;
-                }
-                udpsocket_addrinfo = udpsocket_addrinfo_create_from_addrinfo(result);
-                if (udpsocket_addrinfo == NULL) {
-                        ret = -ENOMEM;
-                        line = __LINE__;
-                        freeaddrinfo(result);
-                        goto bail;
-                }
-                rc = medusa_udpsocket_connect_resolved(udpsocket, options, udpsocket_addrinfo);
+                struct medusa_timer_init_options timer_init_options;
+                rc = medusa_timer_init_options_default(&timer_init_options);
                 if (rc < 0) {
                         ret = rc;
                         line = __LINE__;
-                        freeaddrinfo(result);
                         goto bail;
                 }
-                freeaddrinfo(result);
-        } else {
-                struct medusa_dnsresolver_lookup_options dnsresolver_lookup_options;
-                udpsocket->coptions = medusa_udpsocket_connect_options_duplicate(options);
-                if (MEDUSA_IS_ERR_OR_NULL(udpsocket->coptions)) {
-                        ret = MEDUSA_PTR_ERR(udpsocket->coptions);
+                timer_init_options.monitor      = options->monitor;
+                timer_init_options.resolution   = MEDUSA_TIMER_RESOLUTION_NANOSECONDS;
+                timer_init_options.initial      = MEDUSA_TIMER_INITIAL_NOW;
+                timer_init_options.interval     = 0;
+                timer_init_options.singleshot   = 1;
+                timer_init_options.enabled      = 1;
+                timer_init_options.onevent      = udpsocket_cdefer_onevent;
+                timer_init_options.context      = udpsocket;
+                udpsocket->cdefer = medusa_timer_create_with_options_unlocked(&timer_init_options);
+                if (MEDUSA_IS_ERR_OR_NULL(udpsocket->cdefer)) {
+                        ret = MEDUSA_PTR_ERR(udpsocket->cdefer);
                         line = __LINE__;
                         goto bail;
                 }
+        } else {
+                struct medusa_dnsresolver_lookup_options dnsresolver_lookup_options;
                 rc = medusa_dnsresolver_lookup_options_default(&dnsresolver_lookup_options);
                 if (rc < 0) {
                         ret = rc;
@@ -1953,14 +2035,8 @@ ipv6:
                 }
         }
 
-        if (udpsocket_addrinfo != NULL) {
-                udpsocket_addrinfo_destroy(udpsocket_addrinfo);
-        }
         return udpsocket;
-bail:   if (udpsocket_addrinfo != NULL) {
-                udpsocket_addrinfo_destroy(udpsocket_addrinfo);
-        }
-        if (MEDUSA_IS_ERR_OR_NULL(udpsocket)) {
+bail:   if (MEDUSA_IS_ERR_OR_NULL(udpsocket)) {
                 return MEDUSA_ERR_PTR(ret);
         }
         {
@@ -2933,6 +3009,10 @@ __attribute__ ((visibility ("default"))) int medusa_udpsocket_onevent_unlocked (
                         medusa_dnsresolver_lookup_set_context_unlocked(udpsocket->clookup, NULL);
                         medusa_dnsresolver_lookup_destroy_unlocked(udpsocket->clookup);
                         udpsocket->clookup = NULL;
+                }
+                if (!MEDUSA_IS_ERR_OR_NULL(udpsocket->cdefer)) {
+                        medusa_timer_destroy_unlocked(udpsocket->cdefer);
+                        udpsocket->cdefer = NULL;
                 }
                 if (!MEDUSA_IS_ERR_OR_NULL(udpsocket->coptions)) {
                         medusa_udpsocket_connect_options_destroy(udpsocket->coptions);
