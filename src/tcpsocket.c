@@ -1443,7 +1443,8 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                         } else if (medusa_tcpsocket_get_ssl_unlocked(tcpsocket) == 1) {
 #if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
                                                 if (tcpsocket->ssl_wantread  == 0 &&
-                                                    tcpsocket->ssl_wantwrite == 0) {
+                                                    tcpsocket->ssl_wantwrite == 0 &&
+                                                    SSL_has_pending(tcpsocket->ssl) == 0) {
                                                         break;
                                                 }
 #endif
