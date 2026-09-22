@@ -2,6 +2,7 @@
 #if !defined(MEDUSA_UDPSOCKET_H)
 #define MEDUSA_UDPSOCKET_H
 
+struct medusa_iovec;
 struct sockaddr_storage;
 
 struct medusa_monitor;
@@ -29,10 +30,16 @@ enum {
         MEDUSA_UDPSOCKET_EVENT_IN                       = (1 <<  9), /* 0x00000200 */
         MEDUSA_UDPSOCKET_EVENT_IN_TIMEOUT               = (1 << 10), /* 0x00000400 */
         MEDUSA_UDPSOCKET_EVENT_OUT                      = (1 << 11), /* 0x00000800 */
-        MEDUSA_UDPSOCKET_EVENT_DISCONNECTED             = (1 << 12), /* 0x00001000 */
-        MEDUSA_UDPSOCKET_EVENT_ERROR                    = (1 << 13), /* 0x00002000 */
-        MEDUSA_UDPSOCKET_EVENT_STATE_CHANGED            = (1 << 14), /* 0x00008000 */
-        MEDUSA_UDPSOCKET_EVENT_DESTROY                  = (1 << 15)  /* 0x00010000 */
+        MEDUSA_UDPSOCKET_EVENT_OUT_TIMEOUT              = (1 << 12), /* 0x00001000 */
+        MEDUSA_UDPSOCKET_EVENT_BUFFERED_READ            = (1 << 13), /* 0x00002000 */
+        MEDUSA_UDPSOCKET_EVENT_BUFFERED_READ_TIMEOUT    = (1 << 14), /* 0x00004000 */
+        MEDUSA_UDPSOCKET_EVENT_BUFFERED_WRITE           = (1 << 15), /* 0x00008000 */
+        MEDUSA_UDPSOCKET_EVENT_BUFFERED_WRITE_TIMEOUT   = (1 << 16), /* 0x00010000 */
+        MEDUSA_UDPSOCKET_EVENT_BUFFERED_WRITE_FINISHED  = (1 << 17), /* 0x00020000 */
+        MEDUSA_UDPSOCKET_EVENT_DISCONNECTED             = (1 << 18), /* 0x00040000 */
+        MEDUSA_UDPSOCKET_EVENT_ERROR                    = (1 << 19), /* 0x00080000 */
+        MEDUSA_UDPSOCKET_EVENT_STATE_CHANGED            = (1 << 20), /* 0x00100000 */
+        MEDUSA_UDPSOCKET_EVENT_DESTROY                  = (1 << 21)  /* 0x00200000 */
 #define MEDUSA_UDPSOCKET_EVENT_BINDING                  MEDUSA_UDPSOCKET_EVENT_BINDING
 #define MEDUSA_UDPSOCKET_EVENT_BOUND                    MEDUSA_UDPSOCKET_EVENT_BOUND
 #define MEDUSA_UDPSOCKET_EVENT_LISTENING                MEDUSA_UDPSOCKET_EVENT_LISTENING
@@ -43,6 +50,14 @@ enum {
 #define MEDUSA_UDPSOCKET_EVENT_CONNECT_TIMEOUT          MEDUSA_UDPSOCKET_EVENT_CONNECT_TIMEOUT
 #define MEDUSA_UDPSOCKET_EVENT_CONNECTED                MEDUSA_UDPSOCKET_EVENT_CONNECTED
 #define MEDUSA_UDPSOCKET_EVENT_IN                       MEDUSA_UDPSOCKET_EVENT_IN
+#define MEDUSA_UDPSOCKET_EVENT_IN_TIMEOUT               MEDUSA_UDPSOCKET_EVENT_IN_TIMEOUT
+#define MEDUSA_UDPSOCKET_EVENT_OUT                      MEDUSA_UDPSOCKET_EVENT_OUT
+#define MEDUSA_UDPSOCKET_EVENT_OUT_TIMEOUT              MEDUSA_UDPSOCKET_EVENT_OUT_TIMEOUT
+#define MEDUSA_UDPSOCKET_EVENT_BUFFERED_READ            MEDUSA_UDPSOCKET_EVENT_BUFFERED_READ
+#define MEDUSA_UDPSOCKET_EVENT_BUFFERED_READ_TIMEOUT    MEDUSA_UDPSOCKET_EVENT_BUFFERED_READ_TIMEOUT
+#define MEDUSA_UDPSOCKET_EVENT_BUFFERED_WRITE           MEDUSA_UDPSOCKET_EVENT_BUFFERED_WRITE
+#define MEDUSA_UDPSOCKET_EVENT_BUFFERED_WRITE_TIMEOUT   MEDUSA_UDPSOCKET_EVENT_BUFFERED_WRITE_TIMEOUT
+#define MEDUSA_UDPSOCKET_EVENT_BUFFERED_WRITE_FINISHED  MEDUSA_UDPSOCKET_EVENT_BUFFERED_WRITE_FINISHED
 #define MEDUSA_UDPSOCKET_EVENT_OUT                      MEDUSA_UDPSOCKET_EVENT_OUT
 #define MEDUSA_UDPSOCKET_EVENT_DISCONNECTED             MEDUSA_UDPSOCKET_EVENT_DISCONNECTED
 #define MEDUSA_UDPSOCKET_EVENT_ERROR                    MEDUSA_UDPSOCKET_EVENT_ERROR
@@ -80,10 +95,15 @@ struct medusa_udpsocket_bind_options {
         unsigned int protocol;
         const char *address;
         unsigned short port;
-        int nonblocking;
+        int fd;
+        int clodestroy;
         int reuseaddr;
         int reuseport;
         int freebind;
+        int nonblocking;
+        int buffered;
+        int buffered_read_limit;
+        int buffered_write_limit;
         int enabled;
 };
 
@@ -92,7 +112,15 @@ struct medusa_udpsocket_open_options {
         int (*onevent) (struct medusa_udpsocket *udpsocket, unsigned int events, void *context, void *param);
         void *context;
         unsigned int protocol;
+        int fd;
+        int clodestroy;
+        int reuseaddr;
+        int reuseport;
+        int freebind;
         int nonblocking;
+        int buffered;
+        int buffered_read_limit;
+        int buffered_write_limit;
         int enabled;
 };
 
@@ -108,12 +136,17 @@ struct medusa_udpsocket_connect_options {
         const char *saddress;
         unsigned short sport;
         double resolve_timeout;
+        double connect_timeout;
         double read_timeout;
         int fd;
         int clodestroy;
         int reuseaddr;
         int reuseport;
+        int freebind;
         int nonblocking;
+        int buffered;
+        int buffered_read_limit;
+        int buffered_write_limit;
         int enabled;
 };
 
@@ -125,7 +158,20 @@ struct medusa_udpsocket_attach_options {
         int bound;
         int clodestroy;
         int nonblocking;
+        int buffered;
+        int buffered_read_limit;
+        int buffered_write_limit;
         int enabled;
+};
+
+struct medusa_udpsocket_event_buffered_read {
+        int64_t length;
+        int64_t remaining;
+};
+
+struct medusa_udpsocket_event_buffered_write {
+        int64_t length;
+        int64_t remaining;
 };
 
 struct medusa_udpsocket_event_error {
@@ -138,6 +184,7 @@ struct medusa_udpsocket_event_state_changed {
         unsigned int pstate;
         unsigned int state;
         unsigned int error;
+        unsigned int line;
 };
 
 #ifdef __cplusplus
@@ -172,6 +219,15 @@ int medusa_udpsocket_get_enabled (const struct medusa_udpsocket *udpsocket);
 int medusa_udpsocket_enable (struct medusa_udpsocket *udpsocket);
 int medusa_udpsocket_disable (struct medusa_udpsocket *udpsocket);
 
+int medusa_udpsocket_set_buffered (struct medusa_udpsocket *udpsocket, int enabled);
+int medusa_udpsocket_get_buffered (const struct medusa_udpsocket *udpsocket);
+
+int medusa_udpsocket_set_buffered_read_limit (struct medusa_udpsocket *udpsocket, int limit);
+int medusa_udpsocket_get_buffered_read_limit (const struct medusa_udpsocket *udpsocket);
+
+int medusa_udpsocket_set_buffered_write_limit (struct medusa_udpsocket *udpsocket, int limit);
+int medusa_udpsocket_get_buffered_write_limit (const struct medusa_udpsocket *udpsocket);
+
 int medusa_udpsocket_set_clodestroy (struct medusa_udpsocket *udpsocket, int enabled);
 int medusa_udpsocket_get_clodestroy (const struct medusa_udpsocket *udpsocket);
 
@@ -190,10 +246,19 @@ int medusa_udpsocket_get_freebind (const struct medusa_udpsocket *udpsocket);
 int medusa_udpsocket_set_resolve_timeout (struct medusa_udpsocket *udpsocket, double timeout);
 double medusa_udpsocket_get_resolve_timeout (const struct medusa_udpsocket *udpsocket);
 
+int medusa_udpsocket_set_connect_timeout (struct medusa_udpsocket *udpsocket, double timeout);
+double medusa_udpsocket_get_connect_timeout (const struct medusa_udpsocket *udpsocket);
+
 int medusa_udpsocket_set_read_timeout (struct medusa_udpsocket *udpsocket, double timeout);
 double medusa_udpsocket_get_read_timeout (const struct medusa_udpsocket *udpsocket);
 
+int medusa_udpsocket_set_write_timeout (struct medusa_udpsocket *udpsocket, double timeout);
+double medusa_udpsocket_get_write_timeout (const struct medusa_udpsocket *udpsocket);
+
 int medusa_udpsocket_get_fd (const struct medusa_udpsocket *udpsocket);
+struct medusa_io * medusa_udpsocket_get_io (const struct medusa_udpsocket *udpsocket);
+struct medusa_buffer * medusa_udpsocket_get_read_buffer (const struct medusa_udpsocket *udpsocket);
+struct medusa_buffer * medusa_udpsocket_get_write_buffer (const struct medusa_udpsocket *udpsocket);
 
 int medusa_udpsocket_set_events (struct medusa_udpsocket *udpsocket, unsigned int events);
 int medusa_udpsocket_add_events (struct medusa_udpsocket *udpsocket, unsigned int events);
@@ -221,6 +286,13 @@ int medusa_udpsocket_set_userdata_uint (struct medusa_udpsocket *udpsocket, unsi
 unsigned int medusa_udpsocket_get_userdata_uint (struct medusa_udpsocket *udpsocket);
 
 struct medusa_monitor * medusa_udpsocket_get_monitor (struct medusa_udpsocket *udpsocket);
+
+int64_t medusa_udpsocket_peek   (const struct medusa_udpsocket *udpsocket, void *data, int64_t length);
+int64_t medusa_udpsocket_read   (struct medusa_udpsocket *udpsocket, void *data, int64_t length);
+int64_t medusa_udpsocket_write  (struct medusa_udpsocket *udpsocket, const void *data, int64_t length);
+int64_t medusa_udpsocket_writev  (struct medusa_udpsocket *udpsocket, const struct medusa_iovec *iovecs, int64_t niovecs);
+int64_t medusa_udpsocket_printf (struct medusa_udpsocket *udpsocket, const char *format, ...)  __attribute__((format(printf, 2, 3)));
+int64_t medusa_udpsocket_vprintf (struct medusa_udpsocket *udpsocket, const char *format, va_list va);
 
 const char * medusa_udpsocket_protocol_string (unsigned int protocol);
 const char * medusa_udpsocket_state_string (unsigned int state);

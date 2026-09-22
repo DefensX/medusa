@@ -14,7 +14,13 @@ struct medusa_udpsocket {
         struct medusa_timer *cdefer;
         struct medusa_dnsresolver_lookup *clookup;
         struct medusa_timer *ltimer;
+        struct medusa_timer *ctimer;
         struct medusa_timer *rtimer;
+        struct medusa_timer *wtimer;
+        struct medusa_buffer *wbuffer;
+        struct medusa_buffer *rbuffer;
+        int wbuffer_limit;
+        int rbuffer_limit;
         void *userdata;
 };
 
