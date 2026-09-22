@@ -2275,8 +2275,8 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_connect_options_de
                 return -EINVAL;
         }
         memset(options, 0, sizeof(struct medusa_tcpsocket_connect_options));
-        options->protocol   = MEDUSA_TCPSOCKET_PROTOCOL_ANY;
-        options->sprotocol  = MEDUSA_TCPSOCKET_PROTOCOL_ANY;
+        options->protocol        = MEDUSA_TCPSOCKET_PROTOCOL_ANY;
+        options->sprotocol       = MEDUSA_TCPSOCKET_PROTOCOL_ANY;
         options->resolve_timeout = -1;
         options->connect_timeout = -1;
         options->read_timeout    = -1;
@@ -2686,7 +2686,8 @@ bind_ipv6:
                             errno != EALREADY &&
                             errno != EWOULDBLOCK &&
                             errno != EINTR) {
-                                if (options->fd < 0) {
+                                if (options->fd < 0 ||
+                                    options->clodestroy == 1) {
                                         tcpsocket_closesocket(fd);
                                 }
                                 fd = -1;
@@ -2716,7 +2717,10 @@ bind_ipv6:
 
         rc = medusa_io_init_options_default(&io_init_options);
         if (rc < 0) {
-                tcpsocket_closesocket(fd);
+                if (options->fd < 0 ||
+                    options->clodestroy == 1) {
+                        tcpsocket_closesocket(fd);
+                }
                 ret = rc;
                 goto bail;
         }
@@ -3396,7 +3400,10 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
 
         rc = medusa_io_init_options_default(&io_init_options);
         if (rc < 0) {
-                tcpsocket_closesocket(fd);
+                if (options->fd < 0 ||
+                    options->clodestroy == 1) {
+                        tcpsocket_closesocket(fd);
+                }
                 ret = rc;
                 goto bail;
         }
@@ -4405,7 +4412,7 @@ __attribute__ ((visibility ("default"))) double medusa_tcpsocket_get_write_timeo
                 return -EINVAL;
         }
         medusa_monitor_lock(tcpsocket->subject.monitor);
-        rc = medusa_tcpsocket_get_write_timeout(tcpsocket);
+        rc = medusa_tcpsocket_get_write_timeout_unlocked(tcpsocket);
         medusa_monitor_unlock(tcpsocket->subject.monitor);
         return rc;
 }
@@ -4480,7 +4487,7 @@ __attribute__ ((visibility ("default"))) double medusa_tcpsocket_get_read_timeou
                 return -EINVAL;
         }
         medusa_monitor_lock(tcpsocket->subject.monitor);
-        rc = medusa_tcpsocket_get_read_timeout(tcpsocket);
+        rc = medusa_tcpsocket_get_read_timeout_unlocked(tcpsocket);
         medusa_monitor_unlock(tcpsocket->subject.monitor);
         return rc;
 }
@@ -4554,7 +4561,7 @@ __attribute__ ((visibility ("default"))) double medusa_tcpsocket_get_connect_tim
                 return -EINVAL;
         }
         medusa_monitor_lock(tcpsocket->subject.monitor);
-        rc = medusa_tcpsocket_get_connect_timeout(tcpsocket);
+        rc = medusa_tcpsocket_get_connect_timeout_unlocked(tcpsocket);
         medusa_monitor_unlock(tcpsocket->subject.monitor);
         return rc;
 }
@@ -4628,7 +4635,7 @@ __attribute__ ((visibility ("default"))) double medusa_tcpsocket_get_resolve_tim
                 return -EINVAL;
         }
         medusa_monitor_lock(tcpsocket->subject.monitor);
-        rc = medusa_tcpsocket_get_resolve_timeout(tcpsocket);
+        rc = medusa_tcpsocket_get_resolve_timeout_unlocked(tcpsocket);
         medusa_monitor_unlock(tcpsocket->subject.monitor);
         return rc;
 }
