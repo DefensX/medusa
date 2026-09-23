@@ -294,6 +294,15 @@ static int64_t ring_buffer_reservev (struct medusa_buffer *buffer, int64_t lengt
                 }
         }
 
+        if (niovecs == 1 &&
+            ring->head + ring->length < ring->size &&
+            ring->head + ring->length + length > ring->size) {
+                rc = ring_buffer_headify(ring);
+                if (rc < 0) {
+                        return rc;
+                }
+        }
+
         dstbeg = ring->head + ring->length;
         dstend = ring->head + ring->length + length;
 
@@ -311,7 +320,7 @@ static int64_t ring_buffer_reservev (struct medusa_buffer *buffer, int64_t lengt
                 riovecs = 1;
         } else if (dstend > ring->size) {
                 iovecs[0].iov_base = ring->data + dstbeg;
-                iovecs[0].iov_len  = ring->size - dstbeg;;
+                iovecs[0].iov_len  = ring->size - dstbeg;
                 riovecs = 1;
                 if (niovecs > 1) {
                         iovecs[1].iov_base = ring->data + 0;
