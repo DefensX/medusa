@@ -17,7 +17,9 @@ struct medusa_udpsocket {
         struct medusa_timer *ctimer;
         struct medusa_timer *rtimer;
         struct medusa_timer *wtimer;
+        int wpackets;
         struct medusa_buffer *wbuffer;
+        int rpackets;
         struct medusa_buffer *rbuffer;
         int wbuffer_limit;
         int rbuffer_limit;
