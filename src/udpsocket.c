@@ -928,12 +928,12 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                 break;
                                         } else {
                                                 struct medusa_udpsocket_event_buffered_write medusa_udpsocket_event_buffered_write;
-                                                clength = medusa_buffer_choke(udpsocket->wbuffer, 0, sizeof(dlength) + wlength);
+                                                clength = medusa_buffer_choke(udpsocket->wbuffer, 0, sizeof(dlength) + dlength);
                                                 if (clength < 0) {
                                                         medusa_errorf("medusa_buffer_choke failed, clength: %d, wlength: %d, blength: %d", (int) clength, (int) wlength, (int) medusa_buffer_get_length(udpsocket->wbuffer));
                                                         goto bail;
                                                 }
-                                                if (clength != (int64_t) (sizeof(dlength) + wlength)) {
+                                                if (clength != (int64_t) (sizeof(dlength) + dlength)) {
                                                         medusa_errorf("medusa_buffer_choke failed, clength: %d, wlength: %d, blength: %d", (int) clength, (int) wlength, (int) medusa_buffer_get_length(udpsocket->wbuffer));
                                                         goto bail;
                                                 }
@@ -1065,9 +1065,10 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                         medusa_errorf("medusa_udpsocket_onevent_unlocked failed, rc: %d", rc);
                                                         goto bail;
                                                 }
+                                                break;
                                         }
                                         {
-                                                rlength = recv(medusa_io_get_fd_unlocked(io), ((char *) iovec.iov_base) + sizeof(dlength), iovec.iov_len, 0);
+                                                rlength = recv(medusa_io_get_fd_unlocked(io), ((char *) iovec.iov_base) + sizeof(dlength), iovec.iov_len - sizeof(dlength), 0);
 #if defined(__WINDOWS__)
                                                 if (rlength == SOCKET_ERROR) {
                                                         switch (WSAGetLastError()) {
@@ -3181,7 +3182,7 @@ __attribute__ ((visibility ("default"))) int medusa_udpsocket_set_enabled_unlock
                     medusa_buffer_get_length(udpsocket->rbuffer) > 0) {
                         struct medusa_udpsocket_event_buffered_read medusa_udpsocket_event_buffered_read;
                         medusa_udpsocket_event_buffered_read.length    = 0;
-                        medusa_udpsocket_event_buffered_read.remaining = medusa_buffer_get_length(udpsocket->rbuffer);
+                        medusa_udpsocket_event_buffered_read.remaining = medusa_buffer_get_length(udpsocket->rbuffer) - (udpsocket->rpackets * sizeof(uint16_t));
                         rc = medusa_udpsocket_onevent_unlocked(udpsocket, MEDUSA_UDPSOCKET_EVENT_BUFFERED_READ, &medusa_udpsocket_event_buffered_read);
                         if (rc < 0) {
                                 return rc;
@@ -3254,6 +3255,7 @@ __attribute__ ((visibility ("default"))) int medusa_udpsocket_set_buffered_unloc
                         if (MEDUSA_IS_ERR_OR_NULL(udpsocket->wbuffer)) {
                                 return MEDUSA_PTR_ERR(udpsocket->wbuffer);
                         }
+                        udpsocket->wpackets = 0;
                 }
                 if (MEDUSA_IS_ERR_OR_NULL(udpsocket->rbuffer)) {
                         struct medusa_buffer_init_options buffer_init_options;
@@ -3267,11 +3269,13 @@ __attribute__ ((visibility ("default"))) int medusa_udpsocket_set_buffered_unloc
                         if (MEDUSA_IS_ERR_OR_NULL(udpsocket->rbuffer)) {
                                 return MEDUSA_PTR_ERR(udpsocket->rbuffer);
                         }
+                        udpsocket->rpackets = 0;
                 } else {
                         rc = medusa_buffer_reset(udpsocket->rbuffer);
                         if (rc != 0) {
                                 return rc;
                         }
+                        udpsocket->rpackets = 0;
                 }
         } else {
                 udpsocket_del_flag(udpsocket, MEDUSA_UDPSOCKET_FLAG_BUFFERED);
@@ -3279,10 +3283,12 @@ __attribute__ ((visibility ("default"))) int medusa_udpsocket_set_buffered_unloc
                         medusa_buffer_destroy(udpsocket->wbuffer);
                         udpsocket->wbuffer = NULL;
                 }
+                udpsocket->wpackets = 0;
                 if (!MEDUSA_IS_ERR_OR_NULL(udpsocket->rbuffer)) {
                         medusa_buffer_destroy(udpsocket->rbuffer);
                         udpsocket->rbuffer = NULL;
                 }
+                udpsocket->rpackets = 0;
         }
         return 0;
 }
