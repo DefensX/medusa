@@ -61,7 +61,7 @@ static const char * g_policies[] = {
 
 /* enough datagrams for the ring head to cycle through the read buffer
  * several times over. */
-#define NPACKETS        600
+#define NPACKETS        5000
 
 struct context {
         int policy;
