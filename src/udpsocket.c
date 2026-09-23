@@ -1120,16 +1120,18 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                 dlength = MIN(0xffff, rlength);
                                                 memcpy(iovec.iov_base, &dlength, sizeof(dlength));
                                                 iovec.iov_len = sizeof(dlength) + dlength;
+                                                udpsocket->rpackets += 1;
                                                 clength = medusa_buffer_commitv(udpsocket->rbuffer, &iovec, 1);
                                                 if (clength < 0) {
+                                                        udpsocket->rpackets -= 1;
                                                         medusa_errorf("medusa_buffer_commitv failed, clength: %d", (int) clength);
                                                         goto bail;
                                                 }
                                                 if (clength != 1) {
+                                                        udpsocket->rpackets -= 1;
                                                         medusa_errorf("medusa_buffer_commitv failed, clength: %d", (int) clength);
                                                         goto bail;
                                                 }
-                                                udpsocket->rpackets += 1;
                                                 if (!MEDUSA_IS_ERR_OR_NULL(udpsocket->rtimer)) {
                                                         double interval;
                                                         interval = medusa_timer_get_interval_unlocked(udpsocket->rtimer);
@@ -4843,11 +4845,12 @@ __attribute__ ((visibility ("default"))) int64_t medusa_udpsocket_read_unlocked 
                 if (rc < 0) {
                         return -EIO;
                 }
+                udpsocket->rpackets -= 1;
                 rc = medusa_buffer_choke(buffer, 0, sizeof(dlen) + dlen);
                 if (rc < 0) {
+                        udpsocket->rpackets += 1;
                         return -EIO;
                 }
-                udpsocket->rpackets -= 1;
                 rc = MIN(dlen, length);
         } else {
                 int fd;
