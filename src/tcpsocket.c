@@ -6178,6 +6178,37 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_sockname (stru
         return rc;
 }
 
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_peerport_unlocked (struct medusa_tcpsocket *tcpsocket)
+{
+        int rc;
+        struct sockaddr_storage sockaddr;
+        rc = medusa_tcpsocket_get_peername_unlocked(tcpsocket, &sockaddr);
+        if (rc < 0) {
+                return rc;
+        }
+        if (sockaddr.ss_family == AF_INET) {
+                struct sockaddr_in *sockaddr_in = (struct sockaddr_in *) &sockaddr;
+                return ntohs(sockaddr_in->sin_port);
+        } else if (sockaddr.ss_family == AF_INET6) {
+                struct sockaddr_in6 *sockaddr_in6 = (struct sockaddr_in6 *) &sockaddr;
+                return ntohs(sockaddr_in6->sin6_port);
+        } else {
+                return -EIO;
+        }
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_peerport (struct medusa_tcpsocket *tcpsocket)
+{
+        int rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_get_peerport_unlocked(tcpsocket);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
 __attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_peername_unlocked (struct medusa_tcpsocket *tcpsocket, struct sockaddr_storage *sockaddr)
 {
         int fd;
