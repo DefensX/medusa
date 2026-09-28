@@ -2781,9 +2781,17 @@ bind_ipv6:
                 ret = rc;
                 goto bail;
         }
+
         rc = medusa_tcpsocket_set_enabled_unlocked(tcpsocket, options->enabled);
         if (rc < 0) {
                 medusa_errorf("can not set enabled option for tcpsocket");
+                ret = rc;
+                goto bail;
+        }
+
+        rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_CONNECT_WAITING, NULL);
+        if (rc < 0) {
+                medusa_errorf("tcpsocket onevent failed, rc: %d", rc);
                 ret = rc;
                 goto bail;
         }
@@ -6674,6 +6682,7 @@ __attribute__ ((visibility ("default"))) const char * medusa_tcpsocket_event_str
         if (events == MEDUSA_TCPSOCKET_EVENT_RESOLVE_TIMEOUT)           return "MEDUSA_TCPSOCKET_EVENT_RESOLVE_TIMEOUT";
         if (events == MEDUSA_TCPSOCKET_EVENT_RESOLVED)                  return "MEDUSA_TCPSOCKET_EVENT_RESOLVED";
         if (events == MEDUSA_TCPSOCKET_EVENT_CONNECTING)                return "MEDUSA_TCPSOCKET_EVENT_CONNECTING";
+        if (events == MEDUSA_TCPSOCKET_EVENT_CONNECT_WAITING)           return "MEDUSA_TCPSOCKET_EVENT_CONNECT_WAITING";
         if (events == MEDUSA_TCPSOCKET_EVENT_CONNECT_TIMEOUT)           return "MEDUSA_TCPSOCKET_EVENT_CONNECT_TIMEOUT";
         if (events == MEDUSA_TCPSOCKET_EVENT_CONNECTED)                 return "MEDUSA_TCPSOCKET_EVENT_CONNECTED";
         if (events == MEDUSA_TCPSOCKET_EVENT_CONNECTED_SSL)             return "MEDUSA_TCPSOCKET_EVENT_CONNECTED_SSL";
