@@ -281,6 +281,24 @@ __attribute__ ((visibility ("default"))) int64_t medusa_buffer_insertfv (struct 
         return ret;
 }
 
+__attribute__ ((visibility ("default"))) int64_t medusa_buffer_prepend_buffer (struct medusa_buffer *buffer, const struct medusa_buffer *sbuffer, int64_t soffset,int64_t length)
+{
+        int64_t bniovecs;
+        struct medusa_iovec biovecs[2];
+        bniovecs = medusa_buffer_peekv(sbuffer, soffset, length, biovecs, sizeof(biovecs) / sizeof(biovecs[0]));
+        if (bniovecs < 0) {
+                return bniovecs;
+        } else if (bniovecs == 0) {
+                return 0;
+        }
+        return medusa_buffer_insertv(buffer, 0, biovecs, bniovecs);
+}
+
+__attribute__ ((visibility ("default"))) int64_t medusa_buffer_prepend_data (struct medusa_buffer *buffer, const void *data, int64_t length)
+{
+        return medusa_buffer_prepend(buffer, data, length);
+}
+
 __attribute__ ((visibility ("default"))) int64_t medusa_buffer_prepend_uint8 (struct medusa_buffer *buffer, uint8_t value)
 {
         return medusa_buffer_prepend(buffer, &value, sizeof(uint8_t));
@@ -347,6 +365,24 @@ __attribute__ ((visibility ("default"))) int64_t medusa_buffer_prepend_uint64_be
         return medusa_buffer_prepend(buffer, &value, sizeof(uint64_t));
 }
 
+__attribute__ ((visibility ("default"))) int64_t medusa_buffer_append_buffer (struct medusa_buffer *buffer, const struct medusa_buffer *sbuffer, int64_t soffset,int64_t length)
+{
+        int64_t bniovecs;
+        struct medusa_iovec biovecs[2];
+        bniovecs = medusa_buffer_peekv(sbuffer, soffset, length, biovecs, sizeof(biovecs) / sizeof(biovecs[0]));
+        if (bniovecs < 0) {
+                return bniovecs;
+        } else if (bniovecs == 0) {
+                return 0;
+        }
+        return medusa_buffer_insertv(buffer, medusa_buffer_get_length(buffer), biovecs, bniovecs);
+}
+
+__attribute__ ((visibility ("default"))) int64_t medusa_buffer_append_data (struct medusa_buffer *buffer, const void *data, int64_t length)
+{
+        return medusa_buffer_append(buffer, data, length);
+}
+
 __attribute__ ((visibility ("default"))) int64_t medusa_buffer_append_uint8 (struct medusa_buffer *buffer, uint8_t value)
 {
         return medusa_buffer_append(buffer, &value, sizeof(uint8_t));
@@ -411,6 +447,24 @@ __attribute__ ((visibility ("default"))) int64_t medusa_buffer_append_uint64_be 
 {
         value = htobe64(value);
         return medusa_buffer_append(buffer, &value, sizeof(uint64_t));
+}
+
+__attribute__ ((visibility ("default"))) int64_t medusa_buffer_insert_buffer (struct medusa_buffer *buffer, int64_t offset, const struct medusa_buffer *sbuffer, int64_t soffset,int64_t length)
+{
+        int64_t bniovecs;
+        struct medusa_iovec biovecs[2];
+        bniovecs = medusa_buffer_peekv(sbuffer, soffset, length, biovecs, sizeof(biovecs) / sizeof(biovecs[0]));
+        if (bniovecs < 0) {
+                return bniovecs;
+        } else if (bniovecs == 0) {
+                return 0;
+        }
+        return medusa_buffer_insertv(buffer, offset, biovecs, bniovecs);
+}
+
+__attribute__ ((visibility ("default"))) int64_t medusa_buffer_insert_data (struct medusa_buffer *buffer, int64_t offset, const void *data, int64_t length)
+{
+        return medusa_buffer_insert(buffer, offset, data, length);
 }
 
 __attribute__ ((visibility ("default"))) int64_t medusa_buffer_insert_uint8 (struct medusa_buffer *buffer, int64_t offset, uint8_t value)

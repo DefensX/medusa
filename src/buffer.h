@@ -80,6 +80,8 @@ int64_t medusa_buffer_appendfv  (struct medusa_buffer *buffer, const char *forma
 int64_t medusa_buffer_insertf   (struct medusa_buffer *buffer, int64_t offset, const char *format, ...)  __attribute__((format(printf, 3, 4)));
 int64_t medusa_buffer_insertfv  (struct medusa_buffer *buffer, int64_t offset, const char *format, va_list va);
 
+int64_t medusa_buffer_prepend_buffer    (struct medusa_buffer *buffer, const struct medusa_buffer *sbuffer, int64_t soffset,int64_t length);
+int64_t medusa_buffer_prepend_data      (struct medusa_buffer *buffer, const void *data, int64_t length);
 int64_t medusa_buffer_prepend_uint8     (struct medusa_buffer *buffer, uint8_t value);
 int64_t medusa_buffer_prepend_uint8_le  (struct medusa_buffer *buffer, uint8_t value);
 int64_t medusa_buffer_prepend_uint8_be  (struct medusa_buffer *buffer, uint8_t value);
@@ -93,6 +95,8 @@ int64_t medusa_buffer_prepend_uint64    (struct medusa_buffer *buffer, uint64_t 
 int64_t medusa_buffer_prepend_uint64_le (struct medusa_buffer *buffer, uint64_t value);
 int64_t medusa_buffer_prepend_uint64_be (struct medusa_buffer *buffer, uint64_t value);
 
+int64_t medusa_buffer_append_buffer    (struct medusa_buffer *buffer, const struct medusa_buffer *sbuffer, int64_t soffset, int64_t length);
+int64_t medusa_buffer_append_data      (struct medusa_buffer *buffer, const void *data, int64_t length);
 int64_t medusa_buffer_append_uint8     (struct medusa_buffer *buffer, uint8_t value);
 int64_t medusa_buffer_append_uint8_le  (struct medusa_buffer *buffer, uint8_t value);
 int64_t medusa_buffer_append_uint8_be  (struct medusa_buffer *buffer, uint8_t value);
@@ -106,6 +110,8 @@ int64_t medusa_buffer_append_uint64    (struct medusa_buffer *buffer, uint64_t v
 int64_t medusa_buffer_append_uint64_le (struct medusa_buffer *buffer, uint64_t value);
 int64_t medusa_buffer_append_uint64_be (struct medusa_buffer *buffer, uint64_t value);
 
+int64_t medusa_buffer_insert_buffer    (struct medusa_buffer *buffer, int64_t offset, const struct medusa_buffer *sbuffer, int64_t soffset, int64_t length);
+int64_t medusa_buffer_insert_data      (struct medusa_buffer *buffer, int64_t offset, const void *data, int64_t length);
 int64_t medusa_buffer_insert_uint8     (struct medusa_buffer *buffer, int64_t offset, uint8_t value);
 int64_t medusa_buffer_insert_uint8_le  (struct medusa_buffer *buffer, int64_t offset, uint8_t value);
 int64_t medusa_buffer_insert_uint8_be  (struct medusa_buffer *buffer, int64_t offset, uint8_t value);
