@@ -44,6 +44,12 @@ struct medusa_buffer_init_options {
         void *context;
 };
 
+struct medusa_buffer_event_write {
+        uint64_t write_offset;
+        uint64_t write_length;
+        uint64_t total_length;
+};
+
 #ifdef __cplusplus
 extern "C"
 {

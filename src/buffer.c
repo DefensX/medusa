@@ -175,7 +175,11 @@ __attribute__ ((visibility ("default"))) int64_t medusa_buffer_insertv (struct m
                 return ret;
         }
         if (ret > 0) {
-                rc = buffer_onevent(buffer, MEDUSA_BUFFER_EVENT_WRITE, NULL);
+                struct medusa_buffer_event_write event_write;
+                event_write.write_offset = offset;
+                event_write.write_length = ret;
+                event_write.total_length = medusa_buffer_get_length(buffer);
+                rc = buffer_onevent(buffer, MEDUSA_BUFFER_EVENT_WRITE, &event_write);
                 if (rc != 0) {
                         medusa_errorf("buffer_onevent failed, rc: %d", rc);
                         return rc;
@@ -534,7 +538,17 @@ __attribute__ ((visibility ("default"))) int64_t medusa_buffer_commitv (struct m
                 return ret;
         }
         if (ret > 0) {
-                rc = buffer_onevent(buffer, MEDUSA_BUFFER_EVENT_WRITE, NULL);
+                int64_t i;
+                struct medusa_buffer_event_write event_write;
+                event_write.write_offset = 0;
+                event_write.write_length = 0;
+                event_write.total_length = 0;
+                for (i = 0; i < niovecs; i++) {
+                        event_write.write_length += iovecs[i].iov_len;
+                }
+                event_write.write_offset = medusa_buffer_get_length(buffer) - event_write.write_length;
+                event_write.total_length = medusa_buffer_get_length(buffer);
+                rc = buffer_onevent(buffer, MEDUSA_BUFFER_EVENT_WRITE, &event_write);
                 if (rc != 0) {
                         medusa_errorf("buffer_onevent failed, rc: %d", rc);
                         return rc;
