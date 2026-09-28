@@ -268,6 +268,7 @@ unsigned int medusa_udpsocket_get_events (const struct medusa_udpsocket *io);
 int medusa_udpsocket_get_protocol (struct medusa_udpsocket *udpsocket);
 int medusa_udpsocket_get_sockport (struct medusa_udpsocket *udpsocket);
 int medusa_udpsocket_get_sockname (struct medusa_udpsocket *udpsocket, struct sockaddr_storage *sockaddr);
+int medusa_udpsocket_get_peerport (struct medusa_udpsocket *udpsocket);
 int medusa_udpsocket_get_peername (struct medusa_udpsocket *udpsocket, struct sockaddr_storage *sockaddr);
 
 int medusa_udpsocket_set_context (struct medusa_udpsocket *udpsocket, void *context);

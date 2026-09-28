@@ -104,6 +104,7 @@ unsigned int medusa_tcpsocket_get_events_unlocked (const struct medusa_tcpsocket
 int medusa_tcpsocket_get_protocol_unlocked (struct medusa_tcpsocket *tcpsocket);
 int medusa_tcpsocket_get_sockport_unlocked (struct medusa_tcpsocket *tcpsocket);
 int medusa_tcpsocket_get_sockname_unlocked (struct medusa_tcpsocket *tcpsocket, struct sockaddr_storage *sockaddr);
+int medusa_tcpsocket_get_peerport_unlocked (struct medusa_tcpsocket *tcpsocket);
 int medusa_tcpsocket_get_peername_unlocked (struct medusa_tcpsocket *tcpsocket, struct sockaddr_storage *sockaddr);
 
 int medusa_tcpsocket_set_onevent_unlocked (struct medusa_tcpsocket *tcpsocket, int (*onevent) (struct medusa_tcpsocket *tcpsocket, unsigned int events, void *context, void *param), void *context);

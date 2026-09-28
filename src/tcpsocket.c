@@ -45,6 +45,7 @@
 #include "timer-private.h"
 #include "dnsresolver.h"
 #include "dnsresolver-private.h"
+#include "url.h"
 #include "tcpsocket.h"
 #include "tcpsocket-private.h"
 #include "tcpsocket-struct.h"
@@ -3015,11 +3016,14 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
         int resolve;
         unsigned int protocol;
         const char *address;
+        int port;
 
+        struct medusa_url *url;
         struct medusa_tcpsocket *tcpsocket;
 
-        ret = -EIO;
-        line = __LINE__;
+        url     = NULL;
+        ret     = -EIO;
+        line    = __LINE__;
 
         tcpsocket = NULL;
 
@@ -3031,12 +3035,32 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
 
         protocol = options->protocol;
         address  = options->address;
+        port     = options->port;
+
         if (address == NULL) {
                 ret = -EINVAL;
                 line = __LINE__;
                 goto bail;
         }
-        if (options->port == 0) {
+
+        url = medusa_url_parse(address);
+        if (url == NULL) {
+                ret = -EINVAL;
+                line = __LINE__;
+                goto bail;
+        }
+
+        address = medusa_url_get_host(url);
+        if (port == 0) {
+                port = medusa_url_get_port(url);
+        }
+
+        if (address == NULL) {
+                ret = -EINVAL;
+                line = __LINE__;
+                goto bail;
+        }
+        if (port == 0) {
                 ret = -EINVAL;
                 line = __LINE__;
                 goto bail;
@@ -3247,6 +3271,9 @@ ipv6:
                         goto bail;
                 }
         }
+        if (options->port != port) {
+                tcpsocket->coptions->port = port;
+        }
 
         if (resolve == 0 ||
             MEDUSA_IS_ERR_OR_NULL(options->dnsresolver) ||
@@ -3299,9 +3326,13 @@ ipv6:
                 }
         }
 
+        medusa_url_destroy(url);
         return tcpsocket;
 bail:   if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
                 return MEDUSA_ERR_PTR(ret);
+        }
+        if (!MEDUSA_IS_ERR_OR_NULL(url)) {
+                medusa_url_destroy(url);
         }
         {
                 struct medusa_tcpsocket_event_error medusa_tcpsocket_event_error;
