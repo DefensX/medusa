@@ -137,7 +137,7 @@ static int64_t ring_buffer_insertv (struct medusa_buffer *buffer, int64_t offset
         }
 
         if (offset < 0) {
-                offset = ring->length + offset;
+                offset = ring->length + offset + 1;
         }
         if (offset < 0) {
                 return -EINVAL;

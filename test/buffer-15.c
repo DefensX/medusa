@@ -111,8 +111,9 @@ static uint64_t get_be64 (const unsigned char *p) { int i; uint64_t v = 0; for (
 /*
  * shadow buffer: an independent reference implementation of the same
  * insert-at-offset / remove-at-offset semantics as buffer-simple.c and
- * buffer-ring.c (including negative-offset-from-end and length == -1
- * meaning "until the end").
+ * buffer-ring.c, including negative offsets counting from the end (for
+ * insert -1 is after the last byte, for everything else it is the last
+ * byte) and length == -1 meaning "until the end".
  */
 
 struct shadow {
@@ -171,7 +172,11 @@ static int shadow_normalize (int64_t slength, int64_t *offset)
 
 static int shadow_insert (struct shadow *s, int64_t offset, const void *data, int64_t length)
 {
-        if (shadow_normalize(s->length, &offset) != 0) {
+        /* insert offsets are gaps between bytes, so -1 is the end, not the last byte */
+        if (offset < 0) {
+                offset = s->length + offset + 1;
+        }
+        if (offset < 0 || offset > s->length) {
                 return -1;
         }
         if (length < 0) {
@@ -369,8 +374,8 @@ static int test_stress (unsigned int type, unsigned int niterations)
                         /* insert at random offset (including negative-from-end) */
                         int64_t length = rand_range(0, sizeof(chunk));
                         int64_t offset = rand_range(0, shadow.length);
-                        if (offset < shadow.length && (rand() % 2) == 0) {
-                                offset = offset - shadow.length; /* equivalent negative offset for the same position */
+                        if ((rand() % 2) == 0) {
+                                offset = offset - shadow.length - 1; /* equivalent negative offset for the same position */
                         }
                         fill_random(chunk, length);
                         rc = medusa_buffer_insert(buffer, offset, chunk, length);
@@ -937,9 +942,10 @@ bail:
 }
 
 /*
- * appendf/printf/vprintf always insert at the current end of the buffer, so
- * they are not exposed to the insertfv() offset bug documented below; they
- * are cross-checked against a plain vsnprintf() of the same format/args.
+ * appendf/printf/vprintf always insert at the current end of the buffer;
+ * they are cross-checked against a plain vsnprintf() of the same
+ * format/args. Formatted inserts anywhere else are covered by
+ * test_insertf_middle() below.
  */
 
 static int vappend_expect (struct medusa_buffer *buffer, struct shadow *shadow, const char *format, ...)
@@ -1028,16 +1034,17 @@ bail:
  * current end. This is the one function family the sanity tests above
  * cannot exercise, since appendf/printf/vprintf always target the end.
  *
- * This used to fail against src/buffer-simple.c and src/buffer-ring.c:
- * both backends' insertfv() reserved (vsnprintf-length + 1) bytes for the
- * formatted text (to make room for vsnprintf's trailing NUL) and shifted
- * the existing tail by that same padded amount, but only added the
- * *unpadded* vsnprintf length to the buffer's logical length. The result
- * was a stray NUL byte left inside the logical content right after the
- * inserted text, and the last byte of whatever followed the insertion
- * point silently dropped. Both backends now format into a scratch buffer
- * and delegate the actual placement to insertv(), which does not have
- * this problem.
+ * Regression test for a fixed bug: buffer-simple.c and buffer-ring.c used
+ * to have their own insertfv(), which reserved (vsnprintf-length + 1)
+ * bytes for the formatted text (to make room for vsnprintf's trailing NUL)
+ * and shifted the existing tail by that same padded amount, but only added
+ * the *unpadded* vsnprintf length to the buffer's logical length. The
+ * result was a stray NUL byte left inside the logical content right after
+ * the inserted text, and the last byte of whatever followed the insertion
+ * point silently dropped. The backend versions are gone; the single
+ * medusa_buffer_insertfv() in src/buffer.c formats into a scratch buffer
+ * and places it with medusa_buffer_insert(), so every printf-style call
+ * shares that one path.
  */
 
 static int test_insertf_middle (unsigned int type, unsigned int niterations)
@@ -1248,7 +1255,7 @@ static int test_negative_paths (unsigned int type)
                 fprintf(stderr, "fail @ negative_paths: insert() past the end accepted, rc: %d\n", rc);
                 goto bail;
         }
-        rc = medusa_buffer_insert(buffer, -(medusa_buffer_get_length(buffer) + 1), data, 1);
+        rc = medusa_buffer_insert(buffer, -(medusa_buffer_get_length(buffer) + 2), data, 1);
         if (rc >= 0) {
                 fprintf(stderr, "fail @ negative_paths: insert() with too-negative offset accepted, rc: %d\n", rc);
                 goto bail;

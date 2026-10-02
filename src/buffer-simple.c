@@ -93,7 +93,7 @@ static int64_t simple_buffer_insertv (struct medusa_buffer *buffer, int64_t offs
                 return -EINVAL;
         }
         if (offset < 0) {
-                offset = simple->length + offset;
+                offset = simple->length + offset + 1;
         }
         if (offset < 0) {
                 return -EINVAL;
