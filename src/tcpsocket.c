@@ -1712,7 +1712,7 @@ ipv6:
                 memset(&sockaddr_in6, 0, sizeof(sockaddr_in6));
                 sockaddr_in6.sin6_family = AF_INET6;
                 if (address == NULL) {
-                        address = "0.0.0.0";
+                        address = "::";
                 } else if (strcmp(address, "localhost") == 0) {
                         address = "::1";
                 } else if (strcmp(address, "loopback") == 0) {
