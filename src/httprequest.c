@@ -1697,7 +1697,11 @@ __attribute__ ((visibility ("default"))) int medusa_httprequest_make_request_unl
                 ret = rc;
                 goto bail;
         }
-        rc = medusa_tcpsocket_printf_unlocked(httprequest->tcpsocket, "Host: %s\r\n", httprequest->host ? httprequest->host : medusa_url_get_host(url));
+        if (httprequest->host == NULL && strchr(medusa_url_get_host(url), ':') != NULL) {
+                rc = medusa_tcpsocket_printf_unlocked(httprequest->tcpsocket, "Host: [%s]\r\n", medusa_url_get_host(url));
+        } else {
+                rc = medusa_tcpsocket_printf_unlocked(httprequest->tcpsocket, "Host: %s\r\n", httprequest->host ? httprequest->host : medusa_url_get_host(url));
+        }
         if (rc < 0) {
                 ret = rc;
                 goto bail;

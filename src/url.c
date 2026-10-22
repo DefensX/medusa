@@ -116,32 +116,9 @@ struct medusa_url * medusa_url_parse (const char *uri)
                 }
         }
 
-        a = strchr(i, '@');
-        t = i;
-        while (1) {
-                p = strchr(t, ':');
-                if (p == NULL || p > a) {
-                        break;
-                } else {
-                        t = p + 1;
-                }
-        };
         e = strchr(i, '/');
-        if ((p != NULL) && (e == NULL || e > p) && (a == NULL || a < p)) {
-                url->port = atoi(p + 1);
-                url->flags |= MEDUSA_URL_FLAG_HAS_PORT;
-                *p = '\0';
-        }
         if (e != NULL) {
                 *e = '\0';
-        }
-
-        url->host = i;
-        if (url->host != NULL && strlen(url->host) == 0) {
-                url->host = NULL;
-        }
-
-        if (e != NULL) {
                 e++;
                 while (*(e + 0) == '/') {
                         e++;
@@ -149,21 +126,39 @@ struct medusa_url * medusa_url_parse (const char *uri)
                 url->path = e;
         }
 
-        if (url->host != NULL) {
-                p = strchr(url->host, '@');
-                if (p != NULL) {
-                        url->username = url->host;
-                        url->host     = p + 1;
-                        *p = '\0';
-                }
-        }
-        if (url->username != NULL) {
+        a = strchr(i, '@');
+        if (a != NULL) {
+                url->username = i;
+                *a = '\0';
+                i = a + 1;
                 p = strchr(url->username, ':');
                 if (p != NULL) {
                         url->password = p + 1;
                         *p = '\0';
                 }
         }
+
+        p = NULL;
+        t = (*i == '[') ? strchr(i, ']') : NULL;
+        if (t != NULL && (*(t + 1) == '\0' || *(t + 1) == ':')) {
+                *t = '\0';
+                i = i + 1;
+                if (*(t + 1) == ':') {
+                        p = t + 1;
+                }
+        } else {
+                p = strchr(i, ':');
+                if (p != NULL && strchr(p + 1, ':') != NULL) {
+                        p = NULL;
+                }
+        }
+        if (p != NULL) {
+                url->port = atoi(p + 1);
+                url->flags |= MEDUSA_URL_FLAG_HAS_PORT;
+                *p = '\0';
+        }
+
+        url->host = i;
 
         if (url->host != NULL && strlen(url->host) == 0) {
                 url->host = NULL;

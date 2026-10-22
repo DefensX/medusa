@@ -3336,11 +3336,11 @@ ipv6:
 
         medusa_url_destroy(url);
         return tcpsocket;
-bail:   if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
-                return MEDUSA_ERR_PTR(ret);
-        }
-        if (!MEDUSA_IS_ERR_OR_NULL(url)) {
+bail:   if (!MEDUSA_IS_ERR_OR_NULL(url)) {
                 medusa_url_destroy(url);
+        }
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return MEDUSA_ERR_PTR(ret);
         }
         {
                 struct medusa_tcpsocket_event_error medusa_tcpsocket_event_error;
