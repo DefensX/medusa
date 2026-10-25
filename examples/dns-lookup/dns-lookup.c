@@ -187,6 +187,11 @@ int main (int argc, char *argv[])
 {
         int rc;
         int err;
+        char *names;
+
+        char *save;
+        char *first;
+        char *field;
 
         int c;
         const char *option_nameserver;
@@ -211,8 +216,9 @@ int main (int argc, char *argv[])
         WSAStartup(MAKEWORD(2,2), &wsaData);
 #endif
 
-        err = 0;
-        medusa_monitor = NULL;
+        err             = 0;
+        names           = NULL;
+        medusa_monitor  = NULL;
 
         option_nameserver       = OPTION_NAMESERVER_DEFAULT;
         option_port             = OPTION_PORT_DEFAULT;
@@ -303,45 +309,58 @@ int main (int argc, char *argv[])
                 goto out;
         }
 
-        medusa_dnsrequest = medusa_dnsrequest_create(medusa_monitor, dnsrequest_onevent, NULL);
-        if (MEDUSA_IS_ERR_OR_NULL(medusa_dnsrequest)) {
-                err = MEDUSA_PTR_ERR(medusa_dnsrequest);
+        names = strdup(option_name);
+        if (names == NULL) {
+                fprintf(stderr, "can not allocate memory\n");
+                err = -ENOMEM;
                 goto out;
         }
-        rc = medusa_dnsrequest_set_nameserver(medusa_dnsrequest, option_nameserver);
-        if (rc != 0) {
-                err = rc;
-                goto out;
-        }
-        rc = medusa_dnsrequest_set_port(medusa_dnsrequest, option_port);
-        if (rc != 0) {
-                err = rc;
-                goto out;
-        }
-        rc = medusa_dnsrequest_set_code(medusa_dnsrequest, medusa_dnsrequest_opcode_value(option_code));
-        if (rc != 0) {
-                err = rc;
-                goto out;
-        }
-        rc = medusa_dnsrequest_set_type(medusa_dnsrequest, medusa_dnsrequest_record_type_value(option_type));
-        if (rc != 0) {
-                err = rc;
-                goto out;
-        }
-        rc = medusa_dnsrequest_set_name(medusa_dnsrequest, option_name);
-        if (rc != 0) {
-                err = rc;
-                goto out;
-        }
-        rc = medusa_dnsrequest_set_id(medusa_dnsrequest, option_id);
-        if (rc != 0) {
-                err = rc;
-                goto out;
-        }
-        rc = medusa_dnsrequest_lookup(medusa_dnsrequest);
-        if (rc != 0) {
-                err = rc;
-                goto out;
+        for (first = names, save = NULL; ; first = NULL) {
+                field = strtok_r(first, ",", &save);
+                if (field == NULL) {
+                        break;
+                }
+                fprintf(stderr, "  name      : %s\n", field);
+                medusa_dnsrequest = medusa_dnsrequest_create(medusa_monitor, dnsrequest_onevent, NULL);
+                if (MEDUSA_IS_ERR_OR_NULL(medusa_dnsrequest)) {
+                        err = MEDUSA_PTR_ERR(medusa_dnsrequest);
+                        goto out;
+                }
+                rc = medusa_dnsrequest_set_nameserver(medusa_dnsrequest, option_nameserver);
+                if (rc != 0) {
+                        err = rc;
+                        goto out;
+                }
+                rc = medusa_dnsrequest_set_port(medusa_dnsrequest, option_port);
+                if (rc != 0) {
+                        err = rc;
+                        goto out;
+                }
+                rc = medusa_dnsrequest_set_code(medusa_dnsrequest, medusa_dnsrequest_opcode_value(option_code));
+                if (rc != 0) {
+                        err = rc;
+                        goto out;
+                }
+                rc = medusa_dnsrequest_set_type(medusa_dnsrequest, medusa_dnsrequest_record_type_value(option_type));
+                if (rc != 0) {
+                        err = rc;
+                        goto out;
+                }
+                rc = medusa_dnsrequest_set_name(medusa_dnsrequest, field);
+                if (rc != 0) {
+                        err = rc;
+                        goto out;
+                }
+                rc = medusa_dnsrequest_set_id(medusa_dnsrequest, option_id);
+                if (rc != 0) {
+                        err = rc;
+                        goto out;
+                }
+                rc = medusa_dnsrequest_lookup(medusa_dnsrequest);
+                if (rc != 0) {
+                        err = rc;
+                        goto out;
+                }
         }
 
         while (g_running == 1) {
@@ -358,6 +377,9 @@ int main (int argc, char *argv[])
 
 out:    if (!MEDUSA_IS_ERR_OR_NULL(medusa_monitor)) {
                 medusa_monitor_destroy(medusa_monitor);
+        }
+        if (names != NULL) {
+                free(names);
         }
         return err;
 }
