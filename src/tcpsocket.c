@@ -1243,6 +1243,9 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                 }
                                                 if (!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK) &&
                                                     SSL_get_state(tcpsocket->ssl) == TLS_ST_OK) {
+                                                        /* errno set above is checked below, the callback may change it */
+                                                        int serrno;
+                                                        serrno = errno;
                                                         tcpsocket_add_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK);
 #if defined(MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE) && (MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE == 1)
                                                         rc = tcpsocket_ssl_alpn_selected_update(tcpsocket);
@@ -1256,6 +1259,7 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                                 medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
                                                                 goto bail;
                                                         }
+                                                        errno = serrno;
                                                 }
                                         } else
 #endif
@@ -1580,6 +1584,9 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                 }
                                                 if (!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK) &&
                                                     SSL_get_state(tcpsocket->ssl) == TLS_ST_OK) {
+                                                        /* errno set above is checked below, the callback may change it */
+                                                        int serrno;
+                                                        serrno = errno;
                                                         tcpsocket_add_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK);
 #if defined(MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE) && (MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE == 1)
                                                         rc = tcpsocket_ssl_alpn_selected_update(tcpsocket);
@@ -1593,6 +1600,7 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                                 medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
                                                                 goto bail;
                                                         }
+                                                        errno = serrno;
                                                 }
                                         } else
 #endif
