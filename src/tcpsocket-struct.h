@@ -2,6 +2,8 @@
 #if !defined(MEDUSA_TCPSOCKET_STRUCT_H)
 #define MEDUSA_TCPSOCKET_STRUCT_H
 
+struct tcpsocket_ssl_keylog;
+
 struct medusa_tcpsocket {
         struct medusa_subject subject;
         int (*onevent) (struct medusa_tcpsocket *tcpsocket, unsigned int events, void *context, void *param);
@@ -31,6 +33,8 @@ struct medusa_tcpsocket {
         int ssl_wantread;
         int ssl_wantwrite;
         char *ssl_hostname;
+        char *ssl_keylog_file;
+        struct tcpsocket_ssl_keylog *ssl_keylog;
         char ssl_wbuffer[64 * 1024];
         int ssl_wlength;
         int ssl_wperror;

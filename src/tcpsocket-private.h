@@ -70,6 +70,12 @@ int medusa_tcpsocket_get_ssl_unlocked (const struct medusa_tcpsocket *tcpsocket)
 int medusa_tcpsocket_set_ssl_verify_unlocked (struct medusa_tcpsocket *tcpsocket, int enable);
 int medusa_tcpsocket_get_ssl_verify_unlocked (const struct medusa_tcpsocket *tcpsocket);
 
+int medusa_tcpsocket_set_ssl_keylog_unlocked (struct medusa_tcpsocket *tcpsocket, int enable);
+int medusa_tcpsocket_get_ssl_keylog_unlocked (const struct medusa_tcpsocket *tcpsocket);
+
+int medusa_tcpsocket_set_ssl_keylog_file_unlocked (struct medusa_tcpsocket *tcpsocket, const char *file);
+const char * medusa_tcpsocket_get_ssl_keylog_file_unlocked (const struct medusa_tcpsocket *tcpsocket);
+
 int medusa_tcpsocket_set_ssl_hostname_unlocked (struct medusa_tcpsocket *tcpsocket, const char *hostname);
 const char * medusa_tcpsocket_get_ssl_hostname_unlocked (const struct medusa_tcpsocket *tcpsocket);
 

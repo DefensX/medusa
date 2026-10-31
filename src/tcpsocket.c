@@ -28,6 +28,11 @@
 #define TLS_ST_OK SSL_ST_OK
 #endif
 
+#if OPENSSL_VERSION_NUMBER >= 0x10101000L
+#include <pthread.h>
+#define MEDUSA_TCPSOCKET_SSL_KEYLOG_ENABLE      1
+#endif
+
 #endif
 
 #define MEDUSA_DEBUG_NAME       "tcpsocket"
@@ -78,7 +83,8 @@ enum {
         MEDUSA_TCPSOCKET_FLAG_SSL_CTX_EXTERNAL  = (1 << 15),
         MEDUSA_TCPSOCKET_FLAG_SSL_EXTERNAL      = (1 << 16),
         MEDUSA_TCPSOCKET_FLAG_SSL_VERIFY        = (1 << 17),
-        MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK      = (1 << 18)
+        MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK      = (1 << 18),
+        MEDUSA_TCPSOCKET_FLAG_SSL_KEYLOG        = (1 << 19)
 #define MEDUSA_TCPSOCKET_FLAG_NONE              MEDUSA_TCPSOCKET_FLAG_NONE
 #define MEDUSA_TCPSOCKET_FLAG_BIND              MEDUSA_TCPSOCKET_FLAG_BIND
 #define MEDUSA_TCPSOCKET_FLAG_ACCEPT            MEDUSA_TCPSOCKET_FLAG_ACCEPT
@@ -98,10 +104,131 @@ enum {
 #define MEDUSA_TCPSOCKET_FLAG_SSL_EXTERNAL      MEDUSA_TCPSOCKET_FLAG_SSL_EXTERNAL
 #define MEDUSA_TCPSOCKET_FLAG_SSL_VERIFY        MEDUSA_TCPSOCKET_FLAG_SSL_VERIFY
 #define MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK      MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK
+#define MEDUSA_TCPSOCKET_FLAG_SSL_KEYLOG        MEDUSA_TCPSOCKET_FLAG_SSL_KEYLOG
 };
 
 #if defined(MEDUSA_TCPSOCKET_USE_POOL) && (MEDUSA_TCPSOCKET_USE_POOL == 1)
 static struct medusa_pool *g_pool;
+#endif
+
+#if defined(MEDUSA_TCPSOCKET_SSL_KEYLOG_ENABLE) && (MEDUSA_TCPSOCKET_SSL_KEYLOG_ENABLE == 1)
+
+TAILQ_HEAD(tcpsocket_ssl_keylogs, tcpsocket_ssl_keylog);
+struct tcpsocket_ssl_keylog {
+        char *path;
+        FILE *file;
+        int refcount;
+        TAILQ_ENTRY(tcpsocket_ssl_keylog) tailq;
+};
+
+static pthread_mutex_t g_ssl_keylogs_mutex        = PTHREAD_MUTEX_INITIALIZER;
+static struct tcpsocket_ssl_keylogs g_ssl_keylogs = TAILQ_HEAD_INITIALIZER(g_ssl_keylogs);
+
+static void tcpsocket_ssl_keylog_destroy (struct tcpsocket_ssl_keylog *ssl_keylog)
+{
+        if (ssl_keylog == NULL) {
+                return;
+        }
+        if (ssl_keylog->file != NULL) {
+                fclose(ssl_keylog->file);
+        }
+        if (ssl_keylog->path != NULL) {
+                free(ssl_keylog->path);
+        }
+        free(ssl_keylog);
+}
+
+static struct tcpsocket_ssl_keylog * tcpsocket_ssl_keylog_create (const char *path)
+{
+        struct tcpsocket_ssl_keylog *ssl_keylog;
+
+        ssl_keylog = malloc(sizeof(struct tcpsocket_ssl_keylog));
+        if (ssl_keylog == NULL) {
+                goto bail;
+        }
+        memset(ssl_keylog, 0, sizeof(struct tcpsocket_ssl_keylog));
+        ssl_keylog->path = strdup(path);
+        if (ssl_keylog->path == NULL) {
+                goto bail;
+        }
+#if defined(__WINDOWS__)
+        ssl_keylog->file = fopen(path, "ab");
+#else
+        {
+                int fd;
+                fd = open(path, O_WRONLY | O_CREAT | O_APPEND, 0600);
+                if (fd < 0) {
+                        goto bail;
+                }
+                ssl_keylog->file = fdopen(fd, "a");
+                if (ssl_keylog->file == NULL) {
+                        close(fd);
+                }
+        }
+#endif
+        if (ssl_keylog->file == NULL) {
+                goto bail;
+        }
+
+        return ssl_keylog;
+bail:   if (ssl_keylog != NULL) {
+                tcpsocket_ssl_keylog_destroy(ssl_keylog);
+        }
+        return NULL;
+}
+
+static struct tcpsocket_ssl_keylog * tcpsocket_ssl_keylog_acquire (const char *path)
+{
+        struct tcpsocket_ssl_keylog *ssl_keylog;
+        pthread_mutex_lock(&g_ssl_keylogs_mutex);
+        TAILQ_FOREACH(ssl_keylog, &g_ssl_keylogs, tailq) {
+                if (strcmp(ssl_keylog->path, path) == 0) {
+                        break;
+                }
+        }
+        if (ssl_keylog == NULL) {
+                ssl_keylog = tcpsocket_ssl_keylog_create(path);
+                if (ssl_keylog != NULL) {
+                        TAILQ_INSERT_TAIL(&g_ssl_keylogs, ssl_keylog, tailq);
+                }
+        }
+        if (ssl_keylog != NULL) {
+                ssl_keylog->refcount += 1;
+        }
+        pthread_mutex_unlock(&g_ssl_keylogs_mutex);
+        return ssl_keylog;
+}
+
+static void tcpsocket_ssl_keylog_release (struct tcpsocket_ssl_keylog *ssl_keylog)
+{
+        if (ssl_keylog == NULL) {
+                return;
+        }
+        pthread_mutex_lock(&g_ssl_keylogs_mutex);
+        ssl_keylog->refcount -= 1;
+        if (ssl_keylog->refcount == 0) {
+                TAILQ_REMOVE(&g_ssl_keylogs, ssl_keylog, tailq);
+                tcpsocket_ssl_keylog_destroy(ssl_keylog);
+        }
+        pthread_mutex_unlock(&g_ssl_keylogs_mutex);
+}
+
+static void tcpsocket_ssl_keylog_callback (const SSL *ssl, const char *line)
+{
+        struct medusa_tcpsocket *tcpsocket;
+        tcpsocket = SSL_get_app_data(ssl);
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return;
+        }
+        if (tcpsocket->ssl_keylog == NULL) {
+                return;
+        }
+        pthread_mutex_lock(&g_ssl_keylogs_mutex);
+        fprintf(tcpsocket->ssl_keylog->file, "%s\n", line);
+        fflush(tcpsocket->ssl_keylog->file);
+        pthread_mutex_unlock(&g_ssl_keylogs_mutex);
+}
+
 #endif
 
 TAILQ_HEAD(tcpsocket_addrinfo, tcpsocket_addrinfo_entry);
@@ -1948,6 +2075,16 @@ ipv6:
                 ret = rc;
                 goto bail;
         }
+        rc = medusa_tcpsocket_set_ssl_keylog_unlocked(tcpsocket, options->ssl_keylog);
+        if (rc < 0) {
+                ret = rc;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_ssl_keylog_file_unlocked(tcpsocket, options->ssl_keylog_file);
+        if (rc < 0) {
+                ret = rc;
+                goto bail;
+        }
         rc = medusa_tcpsocket_set_ssl_unlocked(tcpsocket, options->ssl);
         if (rc < 0) {
                 ret = rc;
@@ -2187,6 +2324,16 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 ret = rc;
                 goto bail;
         }
+        rc = medusa_tcpsocket_set_ssl_keylog_unlocked(accepted, medusa_tcpsocket_get_ssl_keylog_unlocked(tcpsocket));
+        if (rc < 0) {
+                ret = rc;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_ssl_keylog_file_unlocked(accepted, medusa_tcpsocket_get_ssl_keylog_file_unlocked(tcpsocket));
+        if (rc < 0) {
+                ret = rc;
+                goto bail;
+        }
         rc = medusa_tcpsocket_set_ssl_unlocked(accepted, medusa_tcpsocket_get_ssl_unlocked(tcpsocket));
         if (rc < 0) {
                 ret = rc;
@@ -2311,6 +2458,9 @@ static void medusa_tcpsocket_connect_options_destroy (struct medusa_tcpsocket_co
         if (options->ssl_ca_certificate != NULL) {
                 free((char *) options->ssl_ca_certificate);
         }
+        if (options->ssl_keylog_file != NULL) {
+                free((char *) options->ssl_keylog_file);
+        }
         free(options);
 }
 
@@ -2398,6 +2548,14 @@ static struct medusa_tcpsocket_connect_options * medusa_tcpsocket_connect_option
                 }
         }
         options->ssl_verify      = source->ssl_verify;
+        options->ssl_keylog      = source->ssl_keylog;
+        if (source->ssl_keylog_file != NULL) {
+                options->ssl_keylog_file = strdup(source->ssl_keylog_file);
+                if (options->ssl_keylog_file == NULL) {
+                        rs = -ENOMEM;
+                        goto bail;
+                }
+        }
         options->enabled         = source->enabled;
 
         return options;
@@ -3149,6 +3307,18 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 goto bail;
         }
         rc = medusa_tcpsocket_set_ssl_hostname_unlocked(tcpsocket, options->ssl_hostname ? options->ssl_hostname : address);
+        if (rc < 0) {
+                ret = rc;
+                line = __LINE__;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_ssl_keylog_unlocked(tcpsocket, options->ssl_keylog);
+        if (rc < 0) {
+                ret = rc;
+                line = __LINE__;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_ssl_keylog_file_unlocked(tcpsocket, options->ssl_keylog_file);
         if (rc < 0) {
                 ret = rc;
                 line = __LINE__;
@@ -4719,6 +4889,23 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_unlocked (
                         (void) SSL_CTX_set_ecdh_auto(tcpsocket->ssl_ctx, 1);
 #endif
                         SSL_CTX_set_mode(tcpsocket->ssl_ctx, SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER);
+#if defined(MEDUSA_TCPSOCKET_SSL_KEYLOG_ENABLE) && (MEDUSA_TCPSOCKET_SSL_KEYLOG_ENABLE == 1)
+                        if (tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_KEYLOG)) {
+                                const char *path;
+                                path = tcpsocket->ssl_keylog_file;
+                                if (path == NULL || path[0] == '\0') {
+                                        path = getenv("SSLKEYLOGFILE");
+                                }
+                                if (path != NULL && path[0] != '\0') {
+                                        tcpsocket->ssl_keylog = tcpsocket_ssl_keylog_acquire(path);
+                                        if (tcpsocket->ssl_keylog == NULL) {
+                                                medusa_errorf("can not open ssl keylog file: %s", path);
+                                        } else {
+                                                SSL_CTX_set_keylog_callback(tcpsocket->ssl_ctx, tcpsocket_ssl_keylog_callback);
+                                        }
+                                }
+                        }
+#endif
                 }
                 if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->ssl_ctx)) {
                         if (!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_BIND)) {
@@ -4811,6 +4998,11 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_unlocked (
                         if (tcpsocket->ssl == NULL) {
                                 return -EIO;
                         }
+#if defined(MEDUSA_TCPSOCKET_SSL_KEYLOG_ENABLE) && (MEDUSA_TCPSOCKET_SSL_KEYLOG_ENABLE == 1)
+                        if (tcpsocket->ssl_keylog != NULL) {
+                                SSL_set_app_data(tcpsocket->ssl, tcpsocket);
+                        }
+#endif
 #if (OPENSSL_VERSION_NUMBER >= 0x10100000L) || (OPENSSL_API_COMPAT >= 0x10100000L)
                         SSL_set_tlsext_host_name(tcpsocket->ssl, tcpsocket->ssl_hostname);
 #endif
@@ -4861,6 +5053,10 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_unlocked (
                         SSL_CTX_free(tcpsocket->ssl_ctx);
                 }
                 tcpsocket->ssl_ctx = NULL;
+#if defined(MEDUSA_TCPSOCKET_SSL_KEYLOG_ENABLE) && (MEDUSA_TCPSOCKET_SSL_KEYLOG_ENABLE == 1)
+                tcpsocket_ssl_keylog_release(tcpsocket->ssl_keylog);
+                tcpsocket->ssl_keylog = NULL;
+#endif
         }
 #endif
         if (enabled) {
@@ -4944,6 +5140,109 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_ssl_verify (co
         }
         medusa_monitor_lock(tcpsocket->subject.monitor);
         rc = medusa_tcpsocket_get_ssl_verify_unlocked(tcpsocket);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_keylog_unlocked (struct medusa_tcpsocket *tcpsocket, int enabled)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        if (enabled) {
+                tcpsocket_add_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_KEYLOG);
+        } else {
+                tcpsocket_del_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_KEYLOG);
+        }
+        return 0;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_keylog (struct medusa_tcpsocket *tcpsocket, int enabled)
+{
+        int rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_set_ssl_keylog_unlocked(tcpsocket, enabled);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_ssl_keylog_unlocked (const struct medusa_tcpsocket *tcpsocket)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        return tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_KEYLOG);
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_get_ssl_keylog (const struct medusa_tcpsocket *tcpsocket)
+{
+        int rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_get_ssl_keylog_unlocked(tcpsocket);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_keylog_file_unlocked (struct medusa_tcpsocket *tcpsocket, const char *file)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+#if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
+        if (tcpsocket->ssl_keylog_file != NULL) {
+                free(tcpsocket->ssl_keylog_file);
+                tcpsocket->ssl_keylog_file = NULL;
+        }
+        if (file != NULL) {
+                tcpsocket->ssl_keylog_file = strdup(file);
+                if (tcpsocket->ssl_keylog_file == NULL) {
+                        return -ENOMEM;
+                }
+        }
+#else
+        (void) file;
+#endif
+        return 0;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_keylog_file (struct medusa_tcpsocket *tcpsocket, const char *file)
+{
+        int rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_set_ssl_keylog_file_unlocked(tcpsocket, file);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_tcpsocket_get_ssl_keylog_file_unlocked (const struct medusa_tcpsocket *tcpsocket)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
+#if defined(MEDUSA_TCPSOCKET_OPENSSL_ENABLE) && (MEDUSA_TCPSOCKET_OPENSSL_ENABLE == 1)
+        return tcpsocket->ssl_keylog_file;
+#else
+        return NULL;
+#endif
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_tcpsocket_get_ssl_keylog_file (const struct medusa_tcpsocket *tcpsocket)
+{
+        const char *rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_get_ssl_keylog_file_unlocked(tcpsocket);
         medusa_monitor_unlock(tcpsocket->subject.monitor);
         return rc;
 }
@@ -5898,9 +6197,17 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_onevent_unlocked (
                         SSL_CTX_free(tcpsocket->ssl_ctx);
                 }
                 tcpsocket->ssl_ctx = NULL;
+#if defined(MEDUSA_TCPSOCKET_SSL_KEYLOG_ENABLE) && (MEDUSA_TCPSOCKET_SSL_KEYLOG_ENABLE == 1)
+                tcpsocket_ssl_keylog_release(tcpsocket->ssl_keylog);
+                tcpsocket->ssl_keylog = NULL;
+#endif
                 if (tcpsocket->ssl_hostname != NULL) {
                         free(tcpsocket->ssl_hostname);
                         tcpsocket->ssl_hostname = NULL;
+                }
+                if (tcpsocket->ssl_keylog_file != NULL) {
+                        free(tcpsocket->ssl_keylog_file);
+                        tcpsocket->ssl_keylog_file = NULL;
                 }
 #endif
 #if defined(MEDUSA_TCPSOCKET_USE_POOL) && (MEDUSA_TCPSOCKET_USE_POOL == 1)
