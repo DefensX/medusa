@@ -33,6 +33,10 @@
 #define MEDUSA_TCPSOCKET_SSL_KEYLOG_ENABLE      1
 #endif
 
+#if OPENSSL_VERSION_NUMBER >= 0x10002000L
+#define MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE        1
+#endif
+
 #endif
 
 #define MEDUSA_DEBUG_NAME       "tcpsocket"
@@ -227,6 +231,108 @@ static void tcpsocket_ssl_keylog_callback (const SSL *ssl, const char *line)
         fprintf(tcpsocket->ssl_keylog->file, "%s\n", line);
         fflush(tcpsocket->ssl_keylog->file);
         pthread_mutex_unlock(&g_ssl_keylogs_mutex);
+}
+
+#endif
+
+#if defined(MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE) && (MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE == 1)
+
+/*
+ * alpn is a comma separated protocol list, in preference order, e.g.
+ * "h2,http/1.1". it is converted to the length prefixed wire format openssl
+ * expects; spaces around entries are ignored, empty or longer than 255 byte
+ * entries are rejected.
+ */
+static int tcpsocket_ssl_alpn_protos_create (const char *alpn, unsigned char **protos, unsigned int *protos_length)
+{
+        size_t l;
+        const char *b;
+        const char *e;
+        unsigned char *p;
+        unsigned int plength;
+
+        p = malloc(strlen(alpn) + 1);
+        if (p == NULL) {
+                return -ENOMEM;
+        }
+        plength = 0;
+
+        for (b = alpn; ; b = e + 1) {
+                e = strchr(b, ',');
+                if (e == NULL) {
+                        e = b + strlen(b);
+                }
+                l = e - b;
+                while (l > 0 && *b == ' ') {
+                        b++;
+                        l--;
+                }
+                while (l > 0 && b[l - 1] == ' ') {
+                        l--;
+                }
+                if (l == 0 || l > 255) {
+                        free(p);
+                        return -EINVAL;
+                }
+                p[plength++] = (unsigned char) l;
+                memcpy(p + plength, b, l);
+                plength += l;
+                if (*e == '\0') {
+                        break;
+                }
+        }
+
+        *protos = p;
+        *protos_length = plength;
+        return 0;
+}
+
+/*
+ * server side selection: the first protocol of our list the client also
+ * offered. no overlap is answered with the no_application_protocol alert
+ * (rfc 7301 section 3.2); with no list configured alpn is ignored.
+ */
+static int tcpsocket_ssl_alpn_select_callback (SSL *ssl, const unsigned char **out, unsigned char *outlen, const unsigned char *in, unsigned int inlen, void *arg)
+{
+        int rc;
+        unsigned char *selected;
+        unsigned char selected_length;
+        struct medusa_tcpsocket *tcpsocket = arg;
+        (void) ssl;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return SSL_TLSEXT_ERR_NOACK;
+        }
+        if (tcpsocket->ssl_alpn_protos == NULL) {
+                return SSL_TLSEXT_ERR_NOACK;
+        }
+        rc = SSL_select_next_proto(&selected, &selected_length, tcpsocket->ssl_alpn_protos, tcpsocket->ssl_alpn_protos_length, in, inlen);
+        if (rc != OPENSSL_NPN_NEGOTIATED) {
+                return SSL_TLSEXT_ERR_ALERT_FATAL;
+        }
+        *out = selected;
+        *outlen = selected_length;
+        return SSL_TLSEXT_ERR_OK;
+}
+
+static int tcpsocket_ssl_alpn_selected_update (struct medusa_tcpsocket *tcpsocket)
+{
+        unsigned int length;
+        const unsigned char *selected;
+        if (tcpsocket->ssl_alpn_selected != NULL) {
+                free(tcpsocket->ssl_alpn_selected);
+                tcpsocket->ssl_alpn_selected = NULL;
+        }
+        SSL_get0_alpn_selected(tcpsocket->ssl, &selected, &length);
+        if (selected == NULL || length == 0) {
+                return 0;
+        }
+        tcpsocket->ssl_alpn_selected = malloc(length + 1);
+        if (tcpsocket->ssl_alpn_selected == NULL) {
+                return -ENOMEM;
+        }
+        memcpy(tcpsocket->ssl_alpn_selected, selected, length);
+        tcpsocket->ssl_alpn_selected[length] = '\0';
+        return 0;
 }
 
 #endif
@@ -1138,6 +1244,13 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                 if (!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK) &&
                                                     SSL_get_state(tcpsocket->ssl) == TLS_ST_OK) {
                                                         tcpsocket_add_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK);
+#if defined(MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE) && (MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE == 1)
+                                                        rc = tcpsocket_ssl_alpn_selected_update(tcpsocket);
+                                                        if (rc < 0) {
+                                                                medusa_errorf("tcpsocket_ssl_alpn_selected_update failed, rc: %d", rc);
+                                                                goto bail;
+                                                        }
+#endif
                                                         rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_CONNECTED_SSL, NULL);
                                                         if (rc < 0) {
                                                                 medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
@@ -1468,6 +1581,13 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                 if (!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK) &&
                                                     SSL_get_state(tcpsocket->ssl) == TLS_ST_OK) {
                                                         tcpsocket_add_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_SSL_STATE_OK);
+#if defined(MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE) && (MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE == 1)
+                                                        rc = tcpsocket_ssl_alpn_selected_update(tcpsocket);
+                                                        if (rc < 0) {
+                                                                medusa_errorf("tcpsocket_ssl_alpn_selected_update failed, rc: %d", rc);
+                                                                goto bail;
+                                                        }
+#endif
                                                         rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_CONNECTED_SSL, NULL);
                                                         if (rc < 0) {
                                                                 medusa_errorf("medusa_tcpsocket_onevent_unlocked failed, rc: %d", rc);
@@ -2085,6 +2205,11 @@ ipv6:
                 ret = rc;
                 goto bail;
         }
+        rc = medusa_tcpsocket_set_ssl_alpn_unlocked(tcpsocket, options->ssl_alpn);
+        if (rc < 0) {
+                ret = rc;
+                goto bail;
+        }
         rc = medusa_tcpsocket_set_ssl_unlocked(tcpsocket, options->ssl);
         if (rc < 0) {
                 ret = rc;
@@ -2334,6 +2459,11 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 ret = rc;
                 goto bail;
         }
+        rc = medusa_tcpsocket_set_ssl_alpn_unlocked(accepted, medusa_tcpsocket_get_ssl_alpn_unlocked(tcpsocket));
+        if (rc < 0) {
+                ret = rc;
+                goto bail;
+        }
         rc = medusa_tcpsocket_set_ssl_unlocked(accepted, medusa_tcpsocket_get_ssl_unlocked(tcpsocket));
         if (rc < 0) {
                 ret = rc;
@@ -2461,6 +2591,9 @@ static void medusa_tcpsocket_connect_options_destroy (struct medusa_tcpsocket_co
         if (options->ssl_keylog_file != NULL) {
                 free((char *) options->ssl_keylog_file);
         }
+        if (options->ssl_alpn != NULL) {
+                free((char *) options->ssl_alpn);
+        }
         free(options);
 }
 
@@ -2552,6 +2685,13 @@ static struct medusa_tcpsocket_connect_options * medusa_tcpsocket_connect_option
         if (source->ssl_keylog_file != NULL) {
                 options->ssl_keylog_file = strdup(source->ssl_keylog_file);
                 if (options->ssl_keylog_file == NULL) {
+                        rs = -ENOMEM;
+                        goto bail;
+                }
+        }
+        if (source->ssl_alpn != NULL) {
+                options->ssl_alpn = strdup(source->ssl_alpn);
+                if (options->ssl_alpn == NULL) {
                         rs = -ENOMEM;
                         goto bail;
                 }
@@ -3319,6 +3459,12 @@ __attribute__ ((visibility ("default"))) struct medusa_tcpsocket * medusa_tcpsoc
                 goto bail;
         }
         rc = medusa_tcpsocket_set_ssl_keylog_file_unlocked(tcpsocket, options->ssl_keylog_file);
+        if (rc < 0) {
+                ret = rc;
+                line = __LINE__;
+                goto bail;
+        }
+        rc = medusa_tcpsocket_set_ssl_alpn_unlocked(tcpsocket, options->ssl_alpn);
         if (rc < 0) {
                 ret = rc;
                 line = __LINE__;
@@ -4906,6 +5052,11 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_unlocked (
                                 }
                         }
 #endif
+#if defined(MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE) && (MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE == 1)
+                        if (tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_ACCEPT)) {
+                                SSL_CTX_set_alpn_select_cb(tcpsocket->ssl_ctx, tcpsocket_ssl_alpn_select_callback, tcpsocket);
+                        }
+#endif
                 }
                 if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->ssl_ctx)) {
                         if (!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_BIND)) {
@@ -5006,6 +5157,14 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_unlocked (
 #if (OPENSSL_VERSION_NUMBER >= 0x10100000L) || (OPENSSL_API_COMPAT >= 0x10100000L)
                         SSL_set_tlsext_host_name(tcpsocket->ssl, tcpsocket->ssl_hostname);
 #endif
+#if defined(MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE) && (MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE == 1)
+                        if (!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_ACCEPT) &&
+                            tcpsocket->ssl_alpn_protos != NULL) {
+                                if (SSL_set_alpn_protos(tcpsocket->ssl, tcpsocket->ssl_alpn_protos, tcpsocket->ssl_alpn_protos_length) != 0) {
+                                        return -EIO;
+                                }
+                        }
+#endif
                 }
                 if (!tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_BIND) &&
                     tcpsocket->state == MEDUSA_TCPSOCKET_STATE_CONNECTED &&
@@ -5057,6 +5216,10 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_unlocked (
                 tcpsocket_ssl_keylog_release(tcpsocket->ssl_keylog);
                 tcpsocket->ssl_keylog = NULL;
 #endif
+                if (tcpsocket->ssl_alpn_selected != NULL) {
+                        free(tcpsocket->ssl_alpn_selected);
+                        tcpsocket->ssl_alpn_selected = NULL;
+                }
         }
 #endif
         if (enabled) {
@@ -5243,6 +5406,116 @@ __attribute__ ((visibility ("default"))) const char * medusa_tcpsocket_get_ssl_k
         }
         medusa_monitor_lock(tcpsocket->subject.monitor);
         rc = medusa_tcpsocket_get_ssl_keylog_file_unlocked(tcpsocket);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_alpn_unlocked (struct medusa_tcpsocket *tcpsocket, const char *alpn)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+#if defined(MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE) && (MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE == 1)
+        {
+                int rc;
+                char *nalpn;
+                unsigned char *nprotos;
+                unsigned int nprotos_length;
+                nalpn = NULL;
+                nprotos = NULL;
+                nprotos_length = 0;
+                if (alpn != NULL) {
+                        rc = tcpsocket_ssl_alpn_protos_create(alpn, &nprotos, &nprotos_length);
+                        if (rc < 0) {
+                                return rc;
+                        }
+                        nalpn = strdup(alpn);
+                        if (nalpn == NULL) {
+                                free(nprotos);
+                                return -ENOMEM;
+                        }
+                }
+                if (tcpsocket->ssl_alpn != NULL) {
+                        free(tcpsocket->ssl_alpn);
+                }
+                if (tcpsocket->ssl_alpn_protos != NULL) {
+                        free(tcpsocket->ssl_alpn_protos);
+                }
+                tcpsocket->ssl_alpn = nalpn;
+                tcpsocket->ssl_alpn_protos = nprotos;
+                tcpsocket->ssl_alpn_protos_length = nprotos_length;
+                /* client session already created, list goes out with the next client hello */
+                if (!MEDUSA_IS_ERR_OR_NULL(tcpsocket->ssl) &&
+                    !tcpsocket_has_flag(tcpsocket, MEDUSA_TCPSOCKET_FLAG_ACCEPT)) {
+                        if (SSL_set_alpn_protos(tcpsocket->ssl, tcpsocket->ssl_alpn_protos, tcpsocket->ssl_alpn_protos_length) != 0) {
+                                return -EIO;
+                        }
+                }
+        }
+#else
+        if (alpn != NULL) {
+                return -ENOTSUP;
+        }
+#endif
+        return 0;
+}
+
+__attribute__ ((visibility ("default"))) int medusa_tcpsocket_set_ssl_alpn (struct medusa_tcpsocket *tcpsocket, const char *alpn)
+{
+        int rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return -EINVAL;
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_set_ssl_alpn_unlocked(tcpsocket, alpn);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_tcpsocket_get_ssl_alpn_unlocked (const struct medusa_tcpsocket *tcpsocket)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
+#if defined(MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE) && (MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE == 1)
+        return tcpsocket->ssl_alpn;
+#else
+        return NULL;
+#endif
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_tcpsocket_get_ssl_alpn (const struct medusa_tcpsocket *tcpsocket)
+{
+        const char *rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_get_ssl_alpn_unlocked(tcpsocket);
+        medusa_monitor_unlock(tcpsocket->subject.monitor);
+        return rc;
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_tcpsocket_get_ssl_alpn_selected_unlocked (const struct medusa_tcpsocket *tcpsocket)
+{
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
+#if defined(MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE) && (MEDUSA_TCPSOCKET_SSL_ALPN_ENABLE == 1)
+        return tcpsocket->ssl_alpn_selected;
+#else
+        return NULL;
+#endif
+}
+
+__attribute__ ((visibility ("default"))) const char * medusa_tcpsocket_get_ssl_alpn_selected (const struct medusa_tcpsocket *tcpsocket)
+{
+        const char *rc;
+        if (MEDUSA_IS_ERR_OR_NULL(tcpsocket)) {
+                return MEDUSA_ERR_PTR(-EINVAL);
+        }
+        medusa_monitor_lock(tcpsocket->subject.monitor);
+        rc = medusa_tcpsocket_get_ssl_alpn_selected_unlocked(tcpsocket);
         medusa_monitor_unlock(tcpsocket->subject.monitor);
         return rc;
 }
@@ -6208,6 +6481,18 @@ __attribute__ ((visibility ("default"))) int medusa_tcpsocket_onevent_unlocked (
                 if (tcpsocket->ssl_keylog_file != NULL) {
                         free(tcpsocket->ssl_keylog_file);
                         tcpsocket->ssl_keylog_file = NULL;
+                }
+                if (tcpsocket->ssl_alpn != NULL) {
+                        free(tcpsocket->ssl_alpn);
+                        tcpsocket->ssl_alpn = NULL;
+                }
+                if (tcpsocket->ssl_alpn_protos != NULL) {
+                        free(tcpsocket->ssl_alpn_protos);
+                        tcpsocket->ssl_alpn_protos = NULL;
+                }
+                if (tcpsocket->ssl_alpn_selected != NULL) {
+                        free(tcpsocket->ssl_alpn_selected);
+                        tcpsocket->ssl_alpn_selected = NULL;
                 }
 #endif
 #if defined(MEDUSA_TCPSOCKET_USE_POOL) && (MEDUSA_TCPSOCKET_USE_POOL == 1)

@@ -122,6 +122,7 @@ struct medusa_tcpsocket_bind_options {
         int ssl_verify;
         int ssl_keylog;
         const char *ssl_keylog_file;
+        const char *ssl_alpn;
         int enabled;
 };
 
@@ -169,6 +170,7 @@ struct medusa_tcpsocket_connect_options {
         int ssl_verify;
         int ssl_keylog;
         const char *ssl_keylog_file;
+        const char *ssl_alpn;
         int enabled;
 };
 
@@ -295,6 +297,10 @@ int medusa_tcpsocket_get_ssl_keylog (const struct medusa_tcpsocket *tcpsocket);
 
 int medusa_tcpsocket_set_ssl_keylog_file (struct medusa_tcpsocket *tcpsocket, const char *file);
 const char * medusa_tcpsocket_get_ssl_keylog_file (const struct medusa_tcpsocket *tcpsocket);
+
+int medusa_tcpsocket_set_ssl_alpn (struct medusa_tcpsocket *tcpsocket, const char *alpn);
+const char * medusa_tcpsocket_get_ssl_alpn (const struct medusa_tcpsocket *tcpsocket);
+const char * medusa_tcpsocket_get_ssl_alpn_selected (const struct medusa_tcpsocket *tcpsocket);
 
 int medusa_tcpsocket_set_ssl_hostname (struct medusa_tcpsocket *tcpsocket, const char *hostname);
 const char * medusa_tcpsocket_get_ssl_hostname (const struct medusa_tcpsocket *tcpsocket);

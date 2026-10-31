@@ -35,6 +35,10 @@ struct medusa_tcpsocket {
         char *ssl_hostname;
         char *ssl_keylog_file;
         struct tcpsocket_ssl_keylog *ssl_keylog;
+        char *ssl_alpn;
+        unsigned char *ssl_alpn_protos;
+        unsigned int ssl_alpn_protos_length;
+        char *ssl_alpn_selected;
         char ssl_wbuffer[64 * 1024];
         int ssl_wlength;
         int ssl_wperror;
