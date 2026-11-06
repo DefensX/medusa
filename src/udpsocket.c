@@ -38,6 +38,7 @@
 #include "udpsocket.h"
 #include "udpsocket-private.h"
 #include "udpsocket-struct.h"
+#include "socket-private.h"
 #include "monitor-private.h"
 
 #define MIN(a, b)                               (((a) < (b)) ? (a) : (b))
@@ -802,6 +803,7 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                 medusa_errorf("getsockopt failed, rc: %d", rc);
                                 goto bail;
                         }
+                        valopt = medusa_errno_from_socket_error(valopt);
                         if (valopt != 0) {
                                 struct medusa_udpsocket_event_error medusa_udpsocket_event_error;
                                 medusa_udpsocket_event_error.state = udpsocket->state;
@@ -887,12 +889,7 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                         if (wlength < 0) {
 #if defined(__WINDOWS__)
                                                 if (wlength == SOCKET_ERROR) {
-                                                        switch (WSAGetLastError()) {
-                                                                case WSAEWOULDBLOCK:    errno = EWOULDBLOCK;    break;
-                                                                case WSATRY_AGAIN:      errno = EAGAIN;         break;
-                                                                case WSAEINTR:          errno = EINTR;          break;
-                                                                case WSAECONNRESET:     errno = ECONNRESET;     break;
-                                                        }
+                                                        errno = medusa_errno_from_socket_error(WSAGetLastError());
                                                 }
 #endif
                                                 if (errno != EINTR &&
@@ -977,6 +974,7 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                 medusa_errorf("getsockopt failed, rc: %d", rc);
                                 goto bail;
                         }
+                        valopt = medusa_errno_from_socket_error(valopt);
                         if (valopt != 0) {
                                 struct medusa_udpsocket_event_error medusa_udpsocket_event_error;
                                 medusa_udpsocket_event_error.state = udpsocket->state;
@@ -1183,6 +1181,7 @@ static int udpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                         if (rc < 0) {
                                 valopt = EIO;
                         }
+                        valopt = medusa_errno_from_socket_error(valopt);
                         if (valopt == 0) {
                                 rc = udpsocket_set_state(udpsocket, MEDUSA_UDPSOCKET_STATE_DISCONNECTED, 0, __LINE__);
                                 if (rc < 0) {
@@ -1227,6 +1226,7 @@ out_err:        ;
                         if (rc < 0) {
                                 valopt = 0;
                         }
+                        valopt = medusa_errno_from_socket_error(valopt);
                         if (valopt == 0) {
                                 rc = udpsocket_set_state(udpsocket, MEDUSA_UDPSOCKET_STATE_DISCONNECTED, 0, __LINE__);
                                 if (rc < 0) {
@@ -2258,12 +2258,7 @@ bind_ipv6:
                 if (rc != 0) {
 #if defined(__WINDOWS__)
                         if (rc == SOCKET_ERROR) {
-                                switch (WSAGetLastError()) {
-                                        case WSAEWOULDBLOCK:    errno = EWOULDBLOCK;    break;
-                                        case WSATRY_AGAIN:      errno = EAGAIN;         break;
-                                        case WSAEINTR:          errno = EINTR;          break;
-                                        case WSAECONNRESET:     errno = ECONNRESET;     break;
-                                }
+                                errno = medusa_errno_from_socket_error(WSAGetLastError());
                         }
 #endif
                         if (errno != EINPROGRESS &&
