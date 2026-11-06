@@ -2977,6 +2977,20 @@ bind_ipv6:
                                 goto bail;
                         }
                 }
+                {
+                        struct medusa_tcpsocket_event_connect_socket medusa_tcpsocket_event_connect_socket;
+                        medusa_tcpsocket_event_connect_socket.fd = fd;
+                        rc = medusa_tcpsocket_onevent_unlocked(tcpsocket, MEDUSA_TCPSOCKET_EVENT_CONNECT_SOCKET, &medusa_tcpsocket_event_connect_socket);
+                        if (rc < 0) {
+                                ret = rc;
+                                if (options->fd < 0 ||
+                                    options->clodestroy == 1) {
+                                        tcpsocket_closesocket(fd);
+                                }
+                                medusa_errorf("tcpsocket onevent failed, rc: %d", rc);
+                                goto bail;
+                        }
+                }
                 rc = connect(fd, (const struct sockaddr *) &addrinfo_entry->sockaddr, addrinfo_entry->sockaddr_length);
                 if (rc != 0) {
 #if defined(__WINDOWS__)
@@ -7294,6 +7308,7 @@ __attribute__ ((visibility ("default"))) const char * medusa_tcpsocket_event_str
         if (events == MEDUSA_TCPSOCKET_EVENT_ERROR)                     return "MEDUSA_TCPSOCKET_EVENT_ERROR";
         if (events == MEDUSA_TCPSOCKET_EVENT_STATE_CHANGED)             return "MEDUSA_TCPSOCKET_EVENT_STATE_CHANGED";
         if (events == MEDUSA_TCPSOCKET_EVENT_DESTROY)                   return "MEDUSA_TCPSOCKET_EVENT_DESTROY";
+        if (events == MEDUSA_TCPSOCKET_EVENT_CONNECT_SOCKET)            return "MEDUSA_TCPSOCKET_EVENT_CONNECT_SOCKET";
         return "MEDUSA_TCPSOCKET_EVENT_UNKNOWN";
 }
 

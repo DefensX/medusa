@@ -46,7 +46,8 @@ enum {
         MEDUSA_TCPSOCKET_EVENT_DISCONNECTED             = (1 << 21),
         MEDUSA_TCPSOCKET_EVENT_ERROR                    = (1 << 22),
         MEDUSA_TCPSOCKET_EVENT_STATE_CHANGED            = (1 << 23),
-        MEDUSA_TCPSOCKET_EVENT_DESTROY                  = (1 << 24)
+        MEDUSA_TCPSOCKET_EVENT_DESTROY                  = (1 << 24),
+        MEDUSA_TCPSOCKET_EVENT_CONNECT_SOCKET           = (1 << 25)
 #define MEDUSA_TCPSOCKET_EVENT_BINDING                  MEDUSA_TCPSOCKET_EVENT_BINDING
 #define MEDUSA_TCPSOCKET_EVENT_BOUND                    MEDUSA_TCPSOCKET_EVENT_BOUND
 #define MEDUSA_TCPSOCKET_EVENT_LISTENING                MEDUSA_TCPSOCKET_EVENT_LISTENING
@@ -72,6 +73,7 @@ enum {
 #define MEDUSA_TCPSOCKET_EVENT_ERROR                    MEDUSA_TCPSOCKET_EVENT_ERROR
 #define MEDUSA_TCPSOCKET_EVENT_STATE_CHANGED            MEDUSA_TCPSOCKET_EVENT_STATE_CHANGED
 #define MEDUSA_TCPSOCKET_EVENT_DESTROY                  MEDUSA_TCPSOCKET_EVENT_DESTROY
+#define MEDUSA_TCPSOCKET_EVENT_CONNECT_SOCKET           MEDUSA_TCPSOCKET_EVENT_CONNECT_SOCKET
 };
 
 enum {
@@ -203,6 +205,10 @@ struct medusa_tcpsocket_event_error {
         unsigned int state;
         unsigned int error;
         unsigned int line;
+};
+
+struct medusa_tcpsocket_event_connect_socket {
+        int fd;
 };
 
 struct medusa_tcpsocket_event_state_changed {
