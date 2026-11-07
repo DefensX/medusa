@@ -1191,7 +1191,17 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
                                                         iovec.iov_len = MIN(iovec.iov_len, sizeof(tcpsocket->ssl_wbuffer));
                                                 }
                                                 ERR_clear_error();
+                                                errno = 0;
                                                 wlength = SSL_write(tcpsocket->ssl, iovec.iov_base, iovec.iov_len);
+#if defined(__WINDOWS__)
+                                                if (wlength <= 0) {
+                                                        int error;
+                                                        error = WSAGetLastError();
+                                                        if (error != 0) {
+                                                                errno = medusa_errno_from_socket_error(error);
+                                                        }
+                                                }
+#endif
                                                 if (wlength <= 0) {
                                                         int error;
                                                         error = SSL_get_error(tcpsocket->ssl, wlength);
@@ -1267,13 +1277,13 @@ static int tcpsocket_io_onevent (struct medusa_io *io, unsigned int events, void
 #endif
                                         {
                                                 wlength = send(medusa_io_get_fd_unlocked(io), iovec.iov_base, iovec.iov_len, 0);
-                                        }
-                                        if (wlength < 0) {
 #if defined(__WINDOWS__)
                                                 if (wlength == SOCKET_ERROR) {
                                                         errno = medusa_errno_from_socket_error(WSAGetLastError());
                                                 }
 #endif
+                                        }
+                                        if (wlength < 0) {
                                                 if (errno != EINTR &&
                                                     errno != EAGAIN &&
                                                     errno != EWOULDBLOCK) {
