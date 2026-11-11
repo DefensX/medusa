@@ -41,6 +41,8 @@ static int __socketpair (int family, int type, int protocol, int fd[2])
 	sb = sa;
 
 	if (type == SOCK_STREAM) {
+		int nodelay = 1;
+
 		listener = socket(AF_INET, SOCK_STREAM, 0);
 		if (listener == INVALID_SOCKET) {
 			goto bail;
@@ -80,6 +82,10 @@ static int __socketpair (int family, int type, int protocol, int fd[2])
 		    sa.sin_port        != sb.sin_port) {
 			goto bail;
 		}
+
+		/* a wakeup is a few bytes, nagle would hold it back until the previous one is acked */
+		setsockopt(a, IPPROTO_TCP, TCP_NODELAY, (const char *) &nodelay, sizeof(nodelay));
+		setsockopt(b, IPPROTO_TCP, TCP_NODELAY, (const char *) &nodelay, sizeof(nodelay));
 
 		closesocket(listener);
 		listener = INVALID_SOCKET;
