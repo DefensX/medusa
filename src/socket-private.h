@@ -65,4 +65,16 @@ static inline int medusa_errno_from_socket_error (int error)
 #endif
 }
 
+/* errno of the last failed socket call, winsock does not set errno */
+static inline int medusa_socket_errno (void)
+{
+#if defined(__WINDOWS__)
+        int error;
+        error = WSAGetLastError();
+        return (error != 0) ? medusa_errno_from_socket_error(error) : EIO;
+#else
+        return errno;
+#endif
+}
+
 #endif
