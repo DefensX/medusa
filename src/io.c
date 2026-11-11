@@ -8,6 +8,10 @@
 
 #include <pthread.h>
 
+#if defined(__WINDOWS__)
+#include <winsock2.h>
+#endif
+
 #define MEDUSA_DEBUG_NAME       "io"
 
 #include "debug.h"
@@ -633,7 +637,13 @@ __attribute__ ((visibility ("default"))) int medusa_io_onevent_unlocked (struct 
         }
         if (events & MEDUSA_IO_EVENT_DESTROY) {
                 if (io_get_clodestroy(io)) {
+#if defined(__WINDOWS__)
+                        /* ios are sockets on windows, close() would treat the
+                         * value as a crt descriptor */
+                        closesocket((SOCKET) io->fd);
+#else
                         close(io->fd);
+#endif
                 }
 #if defined(MEDUSA_IO_USE_POOL) && (MEDUSA_IO_USE_POOL == 1)
                 medusa_pool_free(io);

@@ -26,6 +26,7 @@ static const unsigned int g_polls[] = {
         MEDUSA_MONITOR_POLL_SELECT,
 #if defined(__WINDOWS__)
         MEDUSA_MONITOR_POLL_WSAPOLL,
+        MEDUSA_MONITOR_POLL_IOCP,
 #endif
 };
 

@@ -13,6 +13,8 @@ struct medusa_io {
         int (*onevent) (struct medusa_io *io, unsigned int events, void *context, void *param);
         void *context;
         void *userdata;
+        /* owned by the poll backend, NULL when the backend keeps no state */
+        void *poll_backend_data;
 };
 
 int medusa_io_init (struct medusa_io *io, struct medusa_monitor *monitor, int fd, int (*onevent) (struct medusa_io *io, unsigned int events, void *context, void *param), void *context);

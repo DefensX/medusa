@@ -64,6 +64,7 @@
 #include "poll-poll.h"
 #include "poll-select.h"
 #include "poll-wsapoll.h"
+#include "poll-iocp.h"
 #include "poll-backend.h"
 
 #include "signal-sigaction.h"
@@ -114,6 +115,10 @@ struct medusa_monitor {
                 int fired;
                 int stall;
                 int valid;
+                /* woken through poll.backend->wakeup, no fds or io */
+                int native;
+                /* socket pair kind to try first, flips after a pair fails */
+                int stream;
                 struct medusa_io *io;
         } wakeup;
         struct {
@@ -204,6 +209,13 @@ static int monitor_wakeup_io_onevent (struct medusa_io *io, unsigned int events,
 
 static int monitor_wakeup_uninit_unlocked (struct medusa_monitor *monitor)
 {
+#if defined(__WINDOWS__)
+        if (monitor->wakeup.valid == 1 && monitor->wakeup.native == 0) {
+                /* this pair kind did not hold up, start with the other one next time */
+                monitor->wakeup.stream = !monitor->wakeup.stream;
+        }
+#endif
+        monitor->wakeup.native = 0;
         monitor->wakeup.valid = 0;
         monitor->wakeup.stall = 0;
         monitor->wakeup.fired = 0;
@@ -234,9 +246,33 @@ static int monitor_wakeup_init_unlocked (struct medusa_monitor *monitor)
 {
         int rc;
         if (monitor->wakeup.valid == 1) {
-                return 0;
+                if (monitor->wakeup.native == 0 ||
+                    monitor->poll.backend->wakeup != NULL) {
+                        return 0;
+                }
+                /* the backend dropped its native wakeup (fell back to another
+                 * poller), continue with a socket pair */
+                monitor_wakeup_uninit_unlocked(monitor);
         }
+        if (monitor->poll.backend->wakeup != NULL) {
+                monitor->wakeup.native = 1;
+                monitor->wakeup.valid = 1;
+                monitor->wakeup.stall = 0;
+                monitor->wakeup.fired = 0;
+                return 1;
+        }
+#if defined(__WINDOWS__)
+        /* tls interception proxies may reset loopback tcp connections, try a
+         * udp pair as well and remember which one failed last */
+        rc = medusa_pipe2(monitor->wakeup.fds, MEDUSA_PIPE_FLAG_NONBLOCK | ((monitor->wakeup.stream) ? 0 : MEDUSA_PIPE_FLAG_DGRAM));
+        if (rc != 0) {
+                medusa_debugf("can not create %s wakeup fds, trying %s", (monitor->wakeup.stream) ? "stream" : "dgram", (monitor->wakeup.stream) ? "dgram" : "stream");
+                monitor->wakeup.stream = !monitor->wakeup.stream;
+                rc = medusa_pipe2(monitor->wakeup.fds, MEDUSA_PIPE_FLAG_NONBLOCK | ((monitor->wakeup.stream) ? 0 : MEDUSA_PIPE_FLAG_DGRAM));
+        }
+#else
         rc = medusa_pipe2(monitor->wakeup.fds, MEDUSA_PIPE_FLAG_NONBLOCK);
+#endif
         if (rc != 0) {
                 medusa_errorf("can not create wakeup fds");
                 goto bail;
@@ -333,7 +369,18 @@ static int monitor_signal_unlocked (struct medusa_monitor *monitor, unsigned int
                 monitor->running = 1;
         }
         if (monitor->wakeup.fired == 0) {
-                if (monitor->wakeup.valid == 1) {
+                if (monitor->wakeup.valid == 1 && monitor->wakeup.native == 1) {
+                        /* if the backend dropped it meanwhile, the loop thread
+                         * is not blocked and recreates the wakeup itself */
+                        if (monitor->poll.backend->wakeup != NULL) {
+                                rc = monitor->poll.backend->wakeup(monitor->poll.backend);
+                                if (rc < 0) {
+                                        /* leave fired clear, so the next signal posts again */
+                                        medusa_errorf("poll backend wakeup failed, rc: %d", rc);
+                                        return 0;
+                                }
+                        }
+                } else if (monitor->wakeup.valid == 1) {
 #if defined(__WINDOWS__)
                         rc = send(monitor->wakeup.fds[1], (void *) &reason, sizeof(reason), 0);
 #else
@@ -1310,6 +1357,20 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                                 break;
                         }
 #endif
+#if defined(MEDUSA_POLL_IOCP_ENABLE) && (MEDUSA_POLL_IOCP_ENABLE == 1)
+                        /* MEDUSA_POLL_IOCP_DISABLE in the environment keeps the
+                         * wsapoll backend, for field diagnostics */
+                        if (getenv("MEDUSA_POLL_IOCP_DISABLE") == NULL) {
+                                struct medusa_monitor_iocp_init_options iocp_init_options;
+                                iocp_init_options.onevent = monitor_poll_io_onevent;
+                                iocp_init_options.context = monitor;
+                                monitor->poll.backend = medusa_monitor_iocp_create(&iocp_init_options);
+                                if (monitor->poll.backend != NULL) {
+                                        break;
+                                }
+                                medusa_debugf("iocp poll backend is not usable, falling back");
+                        }
+#endif
 #if defined(MEDUSA_POLL_WSAPOLL_ENABLE) && (MEDUSA_POLL_WSAPOLL_ENABLE == 1)
                         struct medusa_monitor_wsapoll_init_options wsapoll_init_options;
                         wsapoll_init_options.onevent = monitor_poll_io_onevent;
@@ -1364,6 +1425,13 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                 wsapoll_init_options.context = monitor;
                 monitor->poll.backend = medusa_monitor_wsapoll_create(&wsapoll_init_options);
 #endif
+#if defined(MEDUSA_POLL_IOCP_ENABLE) && (MEDUSA_POLL_IOCP_ENABLE == 1)
+        } else if (options->poll.type == MEDUSA_MONITOR_POLL_IOCP) {
+                struct medusa_monitor_iocp_init_options iocp_init_options;
+                iocp_init_options.onevent = monitor_poll_io_onevent;
+                iocp_init_options.context = monitor;
+                monitor->poll.backend = medusa_monitor_iocp_create(&iocp_init_options);
+#endif
         } else {
                 medusa_errorf("invalid poll type: %d", options->poll.type);
                 goto bail;
@@ -1372,6 +1440,7 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                 medusa_errorf("can not create poll backend");
                 goto bail;
         }
+        medusa_debugf("poll backend: %s", monitor->poll.backend->name);
         monitor->poll.backend->monitor = monitor;
         if (options->timer.type == MEDUSA_MONITOR_TIMER_DEFAULT) {
                 do {
@@ -1775,6 +1844,20 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_run_timeout (struct 
                 goto bail;
         }
 
+        /* the backend may have fallen back to a poller without a native
+         * wakeup in either process_changes pass above. switch to a socket
+         * pair before blocking, so a wakeup from another thread can not get
+         * lost (recreated forces a zero timeout until the new io is added) */
+        if (monitor->wakeup.native == 1 &&
+            monitor->poll.backend->wakeup == NULL) {
+                rc = monitor_wakeup_init_unlocked(monitor);
+                if (rc < 0) {
+                        goto bail;
+                } else if (rc == 1) {
+                        recreated = 1;
+                }
+        }
+
         rc = monitor_setup_timer(monitor, &remaining);
         if (rc < 0) {
                 goto bail;
@@ -1818,6 +1901,14 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_run_timeout (struct 
         rc = monitor->poll.backend->run(monitor->poll.backend, timespec);
 
         medusa_monitor_lock(monitor);
+
+        if (monitor->wakeup.native == 1) {
+                /* any wakeup posted before this point is either consumed or
+                 * still queued, which only costs an extra loop. changes made
+                 * by the signaller are picked up on the next iteration. */
+                monitor->wakeup.fired = 0;
+                monitor->wakeup.stall = 0;
+        }
 
         if (rc < 0) {
                 goto bail;

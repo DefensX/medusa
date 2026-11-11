@@ -8,6 +8,12 @@ endif
 
 ifneq ($(__WINDOWS__), y)
 override MEDUSA_POLL_WSAPOLL_ENABLE     = n
+override MEDUSA_POLL_IOCP_ENABLE        = n
+endif
+
+# the iocp backend falls back to wsapoll at runtime
+ifneq ($(MEDUSA_POLL_WSAPOLL_ENABLE), y)
+override MEDUSA_POLL_IOCP_ENABLE        = n
 endif
 
 ifneq ($(__DARWIN__), y)
@@ -82,6 +88,11 @@ libmedusa.a_cflags-${MEDUSA_POLL_WSAPOLL_ENABLE} += \
 	-DMEDUSA_POLL_WSAPOLL_ENABLE=1
 libmedusa.a_files-${MEDUSA_POLL_WSAPOLL_ENABLE} += \
 	poll-wsapoll.c
+
+libmedusa.a_cflags-${MEDUSA_POLL_IOCP_ENABLE} += \
+	-DMEDUSA_POLL_IOCP_ENABLE=1
+libmedusa.a_files-${MEDUSA_POLL_IOCP_ENABLE} += \
+	poll-iocp.c
 
 libmedusa.a_cflags-${MEDUSA_TIMER_TIMERFD_ENABLE} += \
 	-DMEDUSA_TIMER_TIMERFD_ENABLE=1
