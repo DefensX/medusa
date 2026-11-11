@@ -8,6 +8,10 @@
 
 #include <pthread.h>
 
+#if defined(__WINDOWS__)
+#include <winsock2.h>
+#endif
+
 #define MEDUSA_DEBUG_NAME       "io"
 
 #include "debug.h"

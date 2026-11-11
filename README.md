@@ -50,7 +50,7 @@ or
 
 #### 3.2.1. openssl
 
-    OPENSSL=openssl-3.5.7
+    OPENSSL=openssl-3.5.9
 
     mkdir -p 3rdparty/openssl-mingw64
     curl -L https://www.openssl.org/source/$OPENSSL.tar.gz | tar -xz -C 3rdparty/openssl-mingw64
