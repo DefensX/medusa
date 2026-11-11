@@ -145,8 +145,6 @@ static const struct medusa_monitor_init_options g_init_options = {
 
 #define MEDUSA_MONITOR_WAKEUP_STALL_THRESHOLD   128
 
-#define MEDUSA_MONITOR_WAKEUP_DEGRADED_TIMEOUT  0.01
-
 static void monitor_wakeup_close (int fd)
 {
 #if defined(__WINDOWS__)
