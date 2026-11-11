@@ -13,98 +13,139 @@
 #include <winsock2.h>
 #include <wspiapi.h>
 
+#include <winsock2.h>
+#include <mswsock.h>
+
 static int __socketpair (int family, int type, int protocol, int fd[2])
 {
-	int listener;
-	int connector;
-	int acceptor;
-	socklen_t size;
-	struct sockaddr_in listen_sockaddr;
-	struct sockaddr_in connect_sockaddr;
+	SOCKET a        = INVALID_SOCKET;
+	SOCKET b        = INVALID_SOCKET;
+	SOCKET listener = INVALID_SOCKET;
+	struct sockaddr_in sa;
+	struct sockaddr_in sb;
+	int size;
 
-        if (protocol != 0) {
-                return -EINVAL;
-        }
-        if (family != AF_INET) {
-                return -EINVAL;
-        }
-	if (fd == NULL) {
-                return -EINVAL;
+	if (fd == NULL || protocol != 0 || family != AF_INET) {
+		return -EINVAL;
+	}
+	if (type != SOCK_STREAM && type != SOCK_DGRAM) {
+		return -EINVAL;
+	}
+	fd[0] = -1;
+	fd[1] = -1;
+
+	memset(&sa, 0, sizeof(sa));
+	sa.sin_family      = AF_INET;
+	sa.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+	sa.sin_port        = 0;
+	sb = sa;
+
+	if (type == SOCK_STREAM) {
+		listener = socket(AF_INET, SOCK_STREAM, 0);
+		if (listener == INVALID_SOCKET) {
+			goto bail;
+		}
+		if (bind(listener, (struct sockaddr *) &sa, sizeof(sa)) == SOCKET_ERROR) {
+			goto bail;
+		}
+		if (listen(listener, 1) == SOCKET_ERROR) {
+			goto bail;
+		}
+		size = sizeof(sa);
+		if (getsockname(listener, (struct sockaddr *) &sa, &size) == SOCKET_ERROR || size != sizeof(sa)) {
+			goto bail;
+		}
+
+		a = socket(AF_INET, SOCK_STREAM, 0);
+		if (a == INVALID_SOCKET) {
+			goto bail;
+		}
+		if (connect(a, (struct sockaddr *) &sa, sizeof(sa)) == SOCKET_ERROR) {
+			goto bail;
+		}
+
+		size = sizeof(sb);
+		b = accept(listener, (struct sockaddr *) &sb, &size);
+		if (b == INVALID_SOCKET || size != sizeof(sb)) {
+			goto bail;
+		}
+
+		/* the accepted peer must be our connector, not another local process that raced us */
+		size = sizeof(sa);
+		if (getsockname(a, (struct sockaddr *) &sa, &size) == SOCKET_ERROR || size != sizeof(sa)) {
+			goto bail;
+		}
+		if (sa.sin_family      != sb.sin_family ||
+		    sa.sin_addr.s_addr != sb.sin_addr.s_addr ||
+		    sa.sin_port        != sb.sin_port) {
+			goto bail;
+		}
+
+		closesocket(listener);
+		listener = INVALID_SOCKET;
+	} else {
+		DWORD bytes;
+		BOOL behavior = FALSE;
+		unsigned long nb;
+		char junk[1];
+		int bufsize = 1024 * 1024;
+
+		a = socket(AF_INET, SOCK_DGRAM, 0);
+		b = socket(AF_INET, SOCK_DGRAM, 0);
+		if (a == INVALID_SOCKET || b == INVALID_SOCKET) {
+			goto bail;
+		}
+		if (bind(a, (struct sockaddr *) &sa, sizeof(sa)) == SOCKET_ERROR ||
+		    bind(b, (struct sockaddr *) &sb, sizeof(sb)) == SOCKET_ERROR) {
+			goto bail;
+		}
+		size = sizeof(sa);
+		if (getsockname(a, (struct sockaddr *) &sa, &size) == SOCKET_ERROR || size != sizeof(sa)) {
+			goto bail;
+		}
+		size = sizeof(sb);
+		if (getsockname(b, (struct sockaddr *) &sb, &size) == SOCKET_ERROR || size != sizeof(sb)) {
+			goto bail;
+		}
+
+		/* each socket now only accepts datagrams from the other one */
+		if (connect(a, (struct sockaddr *) &sb, sizeof(sb)) == SOCKET_ERROR ||
+		    connect(b, (struct sockaddr *) &sa, sizeof(sa)) == SOCKET_ERROR) {
+			goto bail;
+		}
+
+		/* otherwise recv() fails with WSAECONNRESET after ICMP unreachable */
+		WSAIoctl(a, SIO_UDP_CONNRESET, &behavior, sizeof(behavior), NULL, 0, &bytes, NULL, NULL);
+		WSAIoctl(b, SIO_UDP_CONNRESET, &behavior, sizeof(behavior), NULL, 0, &bytes, NULL, NULL);
+
+		setsockopt(a, SOL_SOCKET, SO_RCVBUF, (const char *) &bufsize, sizeof(bufsize));
+		setsockopt(b, SOL_SOCKET, SO_RCVBUF, (const char *) &bufsize, sizeof(bufsize));
+
+		/* drop anything a foreign process sent between bind() and connect() */
+		nb = 1;
+		ioctlsocket(a, FIONBIO, &nb);
+		ioctlsocket(b, FIONBIO, &nb);
+		while (recv(a, junk, sizeof(junk), 0) != SOCKET_ERROR || WSAGetLastError() == WSAEMSGSIZE) { }
+		while (recv(b, junk, sizeof(junk), 0) != SOCKET_ERROR || WSAGetLastError() == WSAEMSGSIZE) { }
+		nb = 0;
+		ioctlsocket(a, FIONBIO, &nb);
+		ioctlsocket(b, FIONBIO, &nb);
 	}
 
-        fd[0] = -1;
-        fd[1] = -1;
-
-	listener  = -1;
-	connector = -1;
-	acceptor  = -1;
-
-	listener = socket(AF_INET, type, 0);
-	if (listener < 0) {
-                return -EIO;
-        }
-	memset(&listen_sockaddr, 0, sizeof(struct sockaddr_in));
-	listen_sockaddr.sin_family      = AF_INET;
-	listen_sockaddr.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
-	listen_sockaddr.sin_port        = 0;
-	if (bind(listener, (struct sockaddr *) &listen_sockaddr, sizeof (listen_sockaddr)) == -1) {
-		goto bail;
-        }
-	if (listen(listener, 1) == -1) {
-		goto bail;
-        }
-
-	connector = socket(AF_INET, type, 0);
-	if (connector < 0) {
-		goto bail;
-        }
-
-	memset(&connect_sockaddr, 0, sizeof(struct sockaddr_in));
-
-	size = sizeof(struct sockaddr_in);
-	if (getsockname(listener, (struct sockaddr *) &connect_sockaddr, &size) == -1) {
-		goto bail;
-        }
-	if (size != sizeof (connect_sockaddr)) {
-		goto bail;
-        }
-	if (connect(connector, (struct sockaddr *) &connect_sockaddr, sizeof(struct sockaddr_in)) == -1) {
-		goto bail;
-        }
-
-	size = sizeof(struct sockaddr_in);
-	acceptor = accept(listener, (struct sockaddr *) &listen_sockaddr, &size);
-	if (acceptor < 0) {
-		goto bail;
-        }
-	if (size != sizeof(struct sockaddr_in)) {
-		goto bail;
-        }
-	size = sizeof(struct sockaddr_in);
-	if (getsockname(connector, (struct sockaddr *) &connect_sockaddr, &size) == -1) {
-		goto bail;
-        }
-	if (size                            != sizeof(struct sockaddr_in) ||
-            listen_sockaddr.sin_family      != connect_sockaddr.sin_family ||
-            listen_sockaddr.sin_addr.s_addr != connect_sockaddr.sin_addr.s_addr ||
-            listen_sockaddr.sin_port        != connect_sockaddr.sin_port) {
-		goto bail;
-        }
-	closesocket(listener);
-	fd[0] = connector;
-	fd[1] = acceptor;
-
+	fd[0] = (int) a;
+	fd[1] = (int) b;
 	return 0;
 
- bail:  if (listener != -1) {
+bail:
+	if (listener != INVALID_SOCKET) {
 		closesocket(listener);
-        }
-	if (connector != -1) {
-		closesocket(connector);
-        }
-	if (acceptor != -1) {
-		closesocket(acceptor);
-        }
+	}
+	if (a != INVALID_SOCKET) {
+		closesocket(a);
+	}
+	if (b != INVALID_SOCKET) {
+		closesocket(b);
+	}
 	return -EIO;
 }
 
@@ -117,22 +158,22 @@ __attribute__ ((visibility ("default"))) int medusa_pipe2 (int pipefd[2], unsign
 {
         int rc;
         unsigned long nonblocking;
-        rc = __socketpair(AF_INET, SOCK_STREAM, 0, pipefd);
+        rc = __socketpair(AF_INET, (flags & MEDUSA_PIPE_FLAG_DGRAM) ? SOCK_DGRAM : SOCK_STREAM, 0, pipefd);
         if (rc < 0) {
                 return rc;
         }
         nonblocking = (flags & MEDUSA_PIPE_FLAG_NONBLOCK) ? 1 : 0;
         rc = ioctlsocket(pipefd[0], FIONBIO, &nonblocking);
         if (rc != 0) {
-                close(pipefd[0]);
-                close(pipefd[1]);
+                closesocket(pipefd[0]);
+                closesocket(pipefd[1]);
                 return rc;
         }
         nonblocking = (flags & MEDUSA_PIPE_FLAG_NONBLOCK) ? 1 : 0;
         rc = ioctlsocket(pipefd[1], FIONBIO, &nonblocking);
         if (rc != 0) {
-                close(pipefd[0]);
-                close(pipefd[1]);
+                closesocket(pipefd[0]);
+                closesocket(pipefd[1]);
                 return rc;
         }
         return 0;
