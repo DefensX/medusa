@@ -202,6 +202,8 @@ static int test_poll (unsigned int poll)
                 goto bail;
         }
 
+#if !defined(__WINDOWS__)
+        /* windows fails getsockname on a socket that is not bound yet */
         {
                 socklen_t sockaddr_length;
                 struct sockaddr_storage sockaddr_storage;
@@ -234,6 +236,7 @@ static int test_poll (unsigned int poll)
                 }
                 fprintf(stderr, "sockaddr: %s:%d\n", sockaddr_address, sockaddr_port);
         }
+#endif
 
         val = 1;
         rc = setsockopt(bind_fd, SOL_SOCKET, SO_REUSEADDR, (const void *) &val, sizeof(val));
@@ -344,6 +347,8 @@ static int test_poll (unsigned int poll)
                 goto bail;
         }
 
+#if !defined(__WINDOWS__)
+        /* windows fails getsockname on a socket that is not bound yet */
         {
                 socklen_t sockaddr_length;
                 struct sockaddr_storage sockaddr_storage;
@@ -376,6 +381,7 @@ static int test_poll (unsigned int poll)
                 }
                 fprintf(stderr, "sockaddr: %s:%d\n", sockaddr_address, sockaddr_port);
         }
+#endif
 
         for (connect_port = 12345; connect_port < 65535; connect_port++) {
                 sockaddr_in.sin_family = AF_INET;

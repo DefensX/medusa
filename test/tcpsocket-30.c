@@ -196,6 +196,8 @@ static int test_poll (unsigned int poll)
                 goto bail;
         }
 
+#if !defined(__WINDOWS__)
+        /* windows fails getsockname on a socket that is not bound yet */
         {
                 socklen_t sockaddr_length;
                 struct sockaddr_storage sockaddr_storage;
@@ -228,6 +230,7 @@ static int test_poll (unsigned int poll)
                 }
                 fprintf(stderr, "sockaddr: %s:%d\n", sockaddr_address, sockaddr_port);
         }
+#endif
 
         val = 1;
         rc = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (const void *) &val, sizeof(val));

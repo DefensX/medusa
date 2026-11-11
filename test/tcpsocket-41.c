@@ -81,12 +81,12 @@ static struct accepted_userdata * accepted_userdata_create (void)
                 goto bail;
         }
         rc = SSL_CTX_use_certificate_file(accepted_userdata->ssl_ctx, "tcpsocket-ssl.crt", SSL_FILETYPE_PEM);
-        if (rc < 0) {
+        if (rc != 1) {
                 fprintf(stderr, "SSL_CTX_use_certificate_file failed\n");
                 goto bail;
         }
         rc = SSL_CTX_use_PrivateKey_file(accepted_userdata->ssl_ctx, "tcpsocket-ssl.key", SSL_FILETYPE_PEM);
-        if (rc < 0) {
+        if (rc != 1) {
                 fprintf(stderr, "SSL_CTX_use_PrivateKey_file failed\n");
                 goto bail;
         }
