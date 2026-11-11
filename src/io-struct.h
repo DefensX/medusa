@@ -13,6 +13,7 @@ struct medusa_io {
         int (*onevent) (struct medusa_io *io, unsigned int events, void *context, void *param);
         void *context;
         void *userdata;
+        void *poll_backend_data;
 };
 
 int medusa_io_init (struct medusa_io *io, struct medusa_monitor *monitor, int fd, int (*onevent) (struct medusa_io *io, unsigned int events, void *context, void *param), void *context);

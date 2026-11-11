@@ -1,3 +1,16 @@
+#if defined(__WINDOWS__)
+
+#include <stdio.h>
+
+int main (int argc, char *argv[])
+{
+        (void) argc;
+        (void) argv;
+        fprintf(stderr, "skipping on windows, needs posix signals\n");
+        return 0;
+}
+
+#else
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -10,6 +23,8 @@
 #include <sys/types.h>
 #include <pthread.h>
 
+#include "watchdog.h"
+
 #include "medusa/error.h"
 #include "medusa/timer.h"
 #include "medusa/signal.h"
@@ -21,14 +36,16 @@ static const unsigned int g_polls[] = {
         MEDUSA_MONITOR_POLL_DEFAULT,
 #if defined(__LINUX__)
         MEDUSA_MONITOR_POLL_EPOLL,
+        MEDUSA_MONITOR_POLL_POLL,
 #endif
 #if defined(__APPLE__)
         MEDUSA_MONITOR_POLL_KQUEUE,
-#endif
         MEDUSA_MONITOR_POLL_POLL,
+#endif
         MEDUSA_MONITOR_POLL_SELECT,
 #if defined(__WINDOWS__)
         MEDUSA_MONITOR_POLL_WSAPOLL,
+        MEDUSA_MONITOR_POLL_IOCP
 #endif
 };
 
@@ -138,12 +155,6 @@ bail:   for (i = 0; i < NMONITORS; i++) {
         return -1;
 }
 
-static void sigalarm_handler (int sig)
-{
-        (void) sig;
-        abort();
-}
-
 static void sigint_handler (int sig)
 {
         (void) sig;
@@ -180,11 +191,10 @@ int main (int argc, char *argv[])
         pthread_create(&thread, &thread_attr, do_nothing_thread, NULL);
 
         srand(time(NULL));
-        signal(SIGALRM, sigalarm_handler);
         signal(SIGINT, sigint_handler);
 
         for (i = 0; i < sizeof(g_polls) / sizeof(g_polls[0]); i++) {
-                alarm(5);
+                watchdog_arm(5, NULL);
                 fprintf(stderr, "testing poll: %d\n", g_polls[i]);
                 rc = test_poll(g_polls[i]);
                 if (rc != 0) {
@@ -199,3 +209,5 @@ int main (int argc, char *argv[])
         pthread_attr_destroy(&thread_attr);
         return 0;
 }
+
+#endif

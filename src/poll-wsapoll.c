@@ -197,10 +197,34 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
         } else {
                 timeout = timespec->tv_sec * 1000 + timespec->tv_nsec / 1000000;
         }
+        if (internal->npfds == 0) {
+                /* WSAPoll fails without sockets */
+                Sleep((timeout < 0) ? INFINITE : (DWORD) timeout);
+                return 0;
+        }
         for (i = 0; i < internal->npfds; i++) {
                 internal->pfds[i].revents = 0;
         }
         count = WSAPoll(internal->pfds, internal->npfds, timeout);
+        if (count == SOCKET_ERROR) {
+                int error;
+                error = WSAGetLastError();
+                /* a socket closed under its io fails the whole call, report it the way poll does */
+                count = 0;
+                for (i = 0; i < internal->npfds; i++) {
+                        WSAPOLLFD pfd;
+                        pfd = internal->pfds[i];
+                        pfd.revents = 0;
+                        if (WSAPoll(&pfd, 1, 0) == SOCKET_ERROR) {
+                                internal->pfds[i].revents = POLLNVAL;
+                                count += 1;
+                        }
+                }
+                if (count == 0) {
+                        medusa_errorf("WSAPoll failed, error: %d", error);
+                        goto bail;
+                }
+        }
         if (count == 0) {
                 return 0;
         }

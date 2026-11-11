@@ -15,13 +15,15 @@ enum {
         MEDUSA_MONITOR_POLL_KQUEUE      = 2,
         MEDUSA_MONITOR_POLL_POLL        = 3,
         MEDUSA_MONITOR_POLL_SELECT      = 4,
-        MEDUSA_MONITOR_POLL_WSAPOLL     = 5
+        MEDUSA_MONITOR_POLL_WSAPOLL     = 5,
+        MEDUSA_MONITOR_POLL_IOCP        = 6
 #define MEDUSA_MONITOR_POLL_DEFAULT     MEDUSA_MONITOR_POLL_DEFAULT
 #define MEDUSA_MONITOR_POLL_EPOLL       MEDUSA_MONITOR_POLL_EPOLL
 #define MEDUSA_MONITOR_POLL_KQUEUE      MEDUSA_MONITOR_POLL_KQUEUE
 #define MEDUSA_MONITOR_POLL_POLL        MEDUSA_MONITOR_POLL_POLL
 #define MEDUSA_MONITOR_POLL_SELECT      MEDUSA_MONITOR_POLL_SELECT
 #define MEDUSA_MONITOR_POLL_WSAPOLL     MEDUSA_MONITOR_POLL_WSAPOLL
+#define MEDUSA_MONITOR_POLL_IOCP        MEDUSA_MONITOR_POLL_IOCP
 };
 
 enum {
@@ -41,6 +43,19 @@ enum {
 #define MEDUSA_MONITOR_SIGNAL_SIGACTION MEDUSA_MONITOR_SIGNAL_SIGACTION
 #define MEDUSA_MONITOR_SIGNAL_NULL      MEDUSA_MONITOR_SIGNAL_NULL
 };
+
+enum {
+        MEDUSA_MONITOR_WAKEUP_DEFAULT   = 0,
+        MEDUSA_MONITOR_WAKEUP_PIPE      = 1,
+        MEDUSA_MONITOR_WAKEUP_NONE      = 2,
+        MEDUSA_MONITOR_WAKEUP_BACKEND   = 3
+#define MEDUSA_MONITOR_WAKEUP_DEFAULT   MEDUSA_MONITOR_WAKEUP_DEFAULT
+#define MEDUSA_MONITOR_WAKEUP_PIPE      MEDUSA_MONITOR_WAKEUP_PIPE
+#define MEDUSA_MONITOR_WAKEUP_NONE      MEDUSA_MONITOR_WAKEUP_NONE
+#define MEDUSA_MONITOR_WAKEUP_BACKEND   MEDUSA_MONITOR_WAKEUP_BACKEND
+};
+
+#define MEDUSA_MONITOR_WAKEUP_INTERVAL_DEFAULT  0.010
 
 enum {
         MEDUSA_MONITOR_FLAG_NONE        = 0x00000000,
@@ -94,6 +109,10 @@ struct medusa_monitor_init_options {
                 } u;
         } signal;
         struct {
+                unsigned int type;
+                double interval;
+        } wakeup;
+        struct {
                 int (*callback) (struct medusa_monitor *monitor, unsigned int events, void *context, void *param);
                 void *context;
         } onevent;
@@ -140,6 +159,12 @@ const char * medusa_monitor_timer_type_string (unsigned int type);
 
 int medusa_monitor_signal_type_value (const char *value);
 const char * medusa_monitor_signal_type_string (unsigned int type);
+
+int medusa_monitor_wakeup_type_value (const char *value);
+const char * medusa_monitor_wakeup_type_string (unsigned int type);
+
+/* the wakeup the monitor resolved to, never MEDUSA_MONITOR_WAKEUP_DEFAULT */
+int medusa_monitor_get_wakeup_type (struct medusa_monitor *monitor);
 
 const char * medusa_monitor_event_string (unsigned int event);
 

@@ -15,6 +15,8 @@
 #include <event2/event.h>
 #include <event2/thread.h>
 
+#include "watchdog.h"
+
 static int g_backend;
 static unsigned int g_nloops;
 static unsigned int g_nsamples;
@@ -235,12 +237,6 @@ bail:   if (event_base != NULL) {
         return -1;
 }
 
-static void alarm_handler (int sig)
-{
-        (void) sig;
-        abort();
-}
-
 int main (int argc, char *argv[])
 {
         int c;
@@ -248,7 +244,6 @@ int main (int argc, char *argv[])
         unsigned int i;
 
         srand(time(NULL));
-        signal(SIGALRM, alarm_handler);
 
         g_backend  = -1;
         g_nloops   = 10;

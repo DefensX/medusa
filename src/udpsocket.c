@@ -1484,7 +1484,7 @@ ipv6:
                 fd = socket(sockaddr->sa_family, SOCK_DGRAM, 0);
         }
         if (fd < 0) {
-                ret = -errno;
+                ret = -medusa_socket_errno();
                 goto bail;
         }
         {
@@ -1497,7 +1497,7 @@ ipv6:
                             options->clodestroy == 1) {
                                 udpsocket_closesocket(fd);
                         }
-                        ret = -errno;
+                        ret = -medusa_socket_errno();
                         goto bail;
                 }
         }
@@ -1516,7 +1516,7 @@ ipv6:
                             options->clodestroy == 1) {
                                 udpsocket_closesocket(fd);
                         }
-                        ret = -errno;
+                        ret = -medusa_socket_errno();
                         goto bail;
                 }
         }
@@ -1549,7 +1549,7 @@ ipv6:
                             options->clodestroy == 1) {
                                 udpsocket_closesocket(fd);
                         }
-                        ret = -errno;
+                        ret = -medusa_socket_errno();
                         goto bail;
                 }
         }
@@ -1559,7 +1559,7 @@ ipv6:
                     options->clodestroy == 1) {
                         udpsocket_closesocket(fd);
                 }
-                ret = -errno;
+                ret = -medusa_socket_errno();
                 goto bail;
         }
 
@@ -1765,7 +1765,7 @@ __attribute__ ((visibility ("default"))) struct medusa_udpsocket * medusa_udpsoc
                 goto bail;
         }
         if (fd < 0) {
-                ret = -errno;
+                ret = -medusa_socket_errno();
                 goto bail;
         }
 
@@ -2064,8 +2064,8 @@ static int medusa_udpsocket_connect_resolved (struct medusa_udpsocket *udpsocket
                         fd = socket(family, SOCK_DGRAM, 0);
                 }
                 if (fd < 0) {
+                        ret = -medusa_socket_errno();
                         medusa_errorf("can not open socket");
-                        ret = -errno;
                         goto bail;
                 }
                 {
@@ -2089,7 +2089,7 @@ static int medusa_udpsocket_connect_resolved (struct medusa_udpsocket *udpsocket
                         rc = fcntl(fd, F_SETFL, flags);
 #endif
                         if (rc != 0) {
-                                ret = -errno;
+                                ret = -medusa_socket_errno();
                                 if (options->fd < 0 ||
                                     options->clodestroy == 1) {
                                         udpsocket_closesocket(fd);
@@ -2215,7 +2215,7 @@ bind_ipv6:
                                 on = 1;
                                 rc = setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, (void *) &on, sizeof(on));
                                 if (rc < 0) {
-                                        ret = -errno;
+                                        ret = -medusa_socket_errno();
                                         if (options->fd < 0 ||
                                             options->clodestroy == 1) {
                                                 udpsocket_closesocket(fd);
@@ -2234,7 +2234,7 @@ bind_ipv6:
                                 rc = 0;
 #endif
                                 if (rc < 0) {
-                                        ret = -errno;
+                                        ret = -medusa_socket_errno();
                                         if (options->fd < 0 ||
                                             options->clodestroy == 1) {
                                                 udpsocket_closesocket(fd);
@@ -2245,7 +2245,7 @@ bind_ipv6:
                         }
                         rc = bind(fd, (struct sockaddr *) &bind_sockaddr, sizeof(struct sockaddr_storage));
                         if (rc != 0) {
-                                ret = -errno;
+                                ret = -medusa_socket_errno();
                                 if (options->fd < 0 ||
                                     options->clodestroy == 1) {
                                         udpsocket_closesocket(fd);
@@ -3493,7 +3493,7 @@ __attribute__ ((visibility ("default"))) int medusa_udpsocket_set_nonblocking_un
                 rc = fcntl(medusa_io_get_fd_unlocked(udpsocket->io), F_SETFL, flags);
 #endif
                 if (rc != 0) {
-                        return -errno;
+                        return -medusa_socket_errno();
                 }
         }
         return 0;
@@ -3550,7 +3550,7 @@ __attribute__ ((visibility ("default"))) int medusa_udpsocket_set_reuseaddr_unlo
                 on = !!enabled;
                 rc = setsockopt(medusa_io_get_fd_unlocked(udpsocket->io), SOL_SOCKET, SO_REUSEADDR, (void *) &on, sizeof(on));
                 if (rc < 0) {
-                        return -errno;
+                        return -medusa_socket_errno();
                 }
         }
         return 0;
@@ -3612,7 +3612,7 @@ __attribute__ ((visibility ("default"))) int medusa_udpsocket_set_reuseport_unlo
                 rc = 0;
 #endif
                 if (rc < 0) {
-                        return -errno;
+                        return -medusa_socket_errno();
                 }
         }
         return 0;
@@ -3687,7 +3687,7 @@ __attribute__ ((visibility ("default"))) int medusa_udpsocket_set_freebind_unloc
                         }
                 }
                 if (rc < 0) {
-                        return -errno;
+                        return -medusa_socket_errno();
                 }
 #else
                 (void) enabled;
@@ -4487,7 +4487,7 @@ __attribute__ ((visibility ("default"))) int medusa_udpsocket_get_sockname_unloc
         memset(sockaddr, 0, sockaddr_length);
         rc = getsockname(fd, (struct sockaddr *) sockaddr, &sockaddr_length);
         if (rc != 0) {
-                return -errno;
+                return -medusa_socket_errno();
         }
         return 0;
 }
@@ -4557,7 +4557,7 @@ __attribute__ ((visibility ("default"))) int medusa_udpsocket_get_peername_unloc
         memset(sockaddr, 0, sockaddr_length);
         rc = getpeername(fd, (struct sockaddr *) sockaddr, &sockaddr_length);
         if (rc != 0) {
-                return -errno;
+                return -medusa_socket_errno();
         }
         return 0;
 }
@@ -4805,7 +4805,7 @@ __attribute__ ((visibility ("default"))) int64_t medusa_udpsocket_peek_unlocked 
                 }
                 rc = recv(fd, data, length, MSG_PEEK);
                 if (rc < 0) {
-                        rc = -errno;
+                        rc = -medusa_socket_errno();
                 }
         }
         return rc;
@@ -4886,7 +4886,7 @@ __attribute__ ((visibility ("default"))) int64_t medusa_udpsocket_read_unlocked 
                 }
                 rc = recv(fd, data, length, 0);
                 if (rc < 0) {
-                        rc = -errno;
+                        rc = -medusa_socket_errno();
                 }
         }
         return rc;
@@ -4956,7 +4956,7 @@ __attribute__ ((visibility ("default"))) int64_t medusa_udpsocket_write_unlocked
                 }
                 rc = send(fd, data, length, 0);
                 if (rc < 0) {
-                        rc = -errno;
+                        rc = -medusa_socket_errno();
                 }
         }
         return rc;
@@ -5028,7 +5028,7 @@ __attribute__ ((visibility ("default"))) int64_t medusa_udpsocket_writev_unlocke
                 for (i = 0; i < niovecs; i++) {
                         sr = send(fd, iovecs[i].iov_base, iovecs[i].iov_len, 0);
                         if (sr < 0) {
-                                rc = -errno;
+                                rc = -medusa_socket_errno();
                                 break;
                         } else if (sr != (int) iovecs[i].iov_len) {
                                 rc += sr;
@@ -5128,7 +5128,7 @@ __attribute__ ((visibility ("default"))) int64_t medusa_udpsocket_vprintf_unlock
                 }
                 rc = send(fd, buffer, length, 0);
                 if (rc < 0) {
-                        rc = -errno;
+                        rc = -medusa_socket_errno();
                 }
                 free(buffer);
         }

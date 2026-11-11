@@ -15,6 +15,8 @@
 #include <sys/socket.h>
 #endif
 
+#include "watchdog.h"
+
 #include "medusa/error.h"
 #include "medusa/tcpsocket.h"
 #include "medusa/monitor.h"
@@ -30,14 +32,16 @@ static const unsigned int g_polls[] = {
         MEDUSA_MONITOR_POLL_DEFAULT,
 #if defined(__LINUX__)
         MEDUSA_MONITOR_POLL_EPOLL,
+        MEDUSA_MONITOR_POLL_POLL,
 #endif
 #if defined(__APPLE__)
         MEDUSA_MONITOR_POLL_KQUEUE,
-#endif
         MEDUSA_MONITOR_POLL_POLL,
+#endif
         MEDUSA_MONITOR_POLL_SELECT,
 #if defined(__WINDOWS__)
         MEDUSA_MONITOR_POLL_WSAPOLL,
+        MEDUSA_MONITOR_POLL_IOCP
 #endif
 };
 
@@ -261,12 +265,6 @@ bail:   if (monitor != NULL) {
         return -1;
 }
 
-static void sigalarm_handler (int sig)
-{
-        (void) sig;
-        abort();
-}
-
 static void sigint_handler (int sig)
 {
         (void) sig;
@@ -282,11 +280,10 @@ int main (int argc, char *argv[])
         (void) argv;
 
         srand(time(NULL));
-        signal(SIGALRM, sigalarm_handler);
         signal(SIGINT, sigint_handler);
 
         for (i = 0; i < sizeof(g_polls) / sizeof(g_polls[0]); i++) {
-                alarm(5);
+                watchdog_arm(5, NULL);
 
                 fprintf(stderr, "testing poll: %d, connect\n", g_polls[i]);
                 rc = test_connect(g_polls[i], 0);
