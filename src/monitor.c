@@ -35,6 +35,7 @@
 #include "tcpsocket-private.h"
 #include "udpsocket.h"
 #include "udpsocket-private.h"
+#include "socket-private.h"
 #include "exec.h"
 #include "exec-private.h"
 #include "httprequest.h"
@@ -111,6 +112,10 @@ struct medusa_monitor {
         struct {
                 int fds[2];
                 int fired;
+                int stall;
+                int valid;
+                int broken;
+                int failed;
                 struct medusa_io *io;
         } wakeup;
         struct {
@@ -140,49 +145,145 @@ static const struct medusa_monitor_init_options g_init_options = {
         }
 };
 
+#define MEDUSA_MONITOR_WAKEUP_STALL_THRESHOLD   128
+#define MEDUSA_MONITOR_WAKEUP_DEGRADED_TIMEOUT  0.01
+
+static void monitor_wakeup_close (int fd)
+{
+#if defined(__WINDOWS__)
+        closesocket((SOCKET) fd);
+#else
+        close(fd);
+#endif
+}
+
 static int monitor_wakeup_io_onevent (struct medusa_io *io, unsigned int events, void *context, void *param)
 {
         int rc;
-        unsigned int reason;
+        int error;
+        int broken;
+        char buffer[64];
         struct medusa_monitor *monitor = (struct medusa_monitor *) context;
         (void) param;
+        rc     = 0;
+        error  = 0;
+        broken = 0;
         if (events & MEDUSA_IO_EVENT_IN) {
                 while (1) {
 #if defined(__WINDOWS__)
-                        rc = recv(io->fd, (void *) &reason, sizeof(reason), 0);
+                        rc = recv(io->fd, buffer, sizeof(buffer), 0);
+                        error = (rc < 0) ? medusa_errno_from_socket_error(WSAGetLastError()) : 0;
 #else
-                        rc = read(io->fd, (void *) &reason, sizeof(reason));
+                        rc = read(io->fd, buffer, sizeof(buffer));
+                        error = (rc < 0) ? errno : 0;
 #endif
-                        if (rc == 0) {
-                                break;
-                        } else if (rc < 0) {
-#if defined(__WINDOWS__)
-                                if (rc == SOCKET_ERROR) {
-                                        switch (WSAGetLastError()) {
-                                                case WSAEWOULDBLOCK:    errno = EWOULDBLOCK;    break;
-                                                case WSATRY_AGAIN:      errno = EAGAIN;         break;
-                                                case WSAEINTR:          errno = EINTR;          break;
-                                                case WSAECONNRESET:     errno = ECONNRESET;     break;
-                                        }
-                                }
-#endif
-
-                                if (errno == EAGAIN ||
-                                    errno == EWOULDBLOCK ||
-                                    errno == EINTR) {
-                                        break;
-                                }
-                                goto bail;
-                        } else if (rc != sizeof(reason)) {
-                                goto bail;
+                        if (rc > 0) {
+                                continue;
                         }
+                        if (rc < 0 &&
+                            (error == EINTR ||
+                             error == EMSGSIZE)) {
+                                continue;
+                        }
+                        if (rc < 0 &&
+                            (error == EAGAIN ||
+                             error == EWOULDBLOCK)) {
+                                break;
+                        }
+                        /* the other end is closed, the connection is reset or aborted, or it is faulty */
+                        broken = 1;
+                        break;
                 }
-                medusa_monitor_lock(monitor);
+        }
+        if (events & (MEDUSA_IO_EVENT_ERR | MEDUSA_IO_EVENT_HUP | MEDUSA_IO_EVENT_NVAL)) {
+                broken = 1;
+        }
+        medusa_monitor_lock(monitor);
+        if (broken != 0) {
+                if (monitor->wakeup.broken == 0) {
+                        medusa_errorf("wakeup channel is broken, rc: %d, errno: %d, events: 0x%08x, it will be recreated", rc, error, events);
+                }
+                monitor->wakeup.broken = 1;
+        } else if (events & MEDUSA_IO_EVENT_IN) {
                 monitor->wakeup.fired = 0;
-                medusa_monitor_unlock(monitor);
+                monitor->wakeup.stall = 0;
+        }
+        medusa_monitor_unlock(monitor);
+        return 0;
+}
+
+static int monitor_wakeup_uninit_unlocked (struct medusa_monitor *monitor)
+{
+        monitor->wakeup.valid  = 0;
+        monitor->wakeup.broken = 0;
+        monitor->wakeup.stall  = 0;
+        monitor->wakeup.fired  = 0;
+        if (!MEDUSA_IS_ERR_OR_NULL(monitor->wakeup.io)) {
+                medusa_io_destroy_unlocked(monitor->wakeup.io);
+        }
+        monitor->wakeup.io = NULL;
+        if (monitor->wakeup.fds[0] >= 0) {
+                monitor_wakeup_close(monitor->wakeup.fds[0]);
+                monitor->wakeup.fds[0] = -1;
+        }
+        if (monitor->wakeup.fds[1] >= 0) {
+                monitor_wakeup_close(monitor->wakeup.fds[1]);
+                monitor->wakeup.fds[1] = -1;
         }
         return 0;
-bail:   return -1;
+}
+
+static int monitor_wakeup_init_unlocked (struct medusa_monitor *monitor)
+{
+        int rc;
+        const char *what;
+        struct medusa_io *io;
+        if (monitor->wakeup.valid == 1) {
+                return 0;
+        }
+        what = "pipe";
+        rc = medusa_pipe2(monitor->wakeup.fds, MEDUSA_PIPE_FLAG_NONBLOCK);
+        if (rc != 0) {
+                monitor->wakeup.fds[0] = -1;
+                monitor->wakeup.fds[1] = -1;
+                goto bail;
+        }
+        what = "io";
+        io = medusa_io_create_unlocked(monitor, monitor->wakeup.fds[0], monitor_wakeup_io_onevent, monitor);
+        if (MEDUSA_IS_ERR_OR_NULL(io)) {
+                rc = MEDUSA_IS_ERR(io) ? MEDUSA_PTR_ERR(io) : -ENOMEM;
+                goto bail;
+        }
+        monitor->wakeup.io = io;
+        rc = medusa_io_set_events_unlocked(monitor->wakeup.io, MEDUSA_IO_EVENT_IN);
+        if (rc < 0) {
+                goto bail;
+        }
+        rc = medusa_io_set_enabled_unlocked(monitor->wakeup.io, 1);
+        if (rc < 0) {
+                goto bail;
+        }
+        monitor->wakeup.valid  = 1;
+        monitor->wakeup.broken = 0;
+        monitor->wakeup.failed = 0;
+        monitor->wakeup.stall  = 0;
+        monitor->wakeup.fired  = 0;
+        return 0;
+bail:   if (monitor->wakeup.failed == 0) {
+                medusa_errorf("can not create wakeup channel, %s, rc: %d", what, rc);
+        }
+        monitor_wakeup_uninit_unlocked(monitor);
+        monitor->wakeup.failed = 1;
+        return -1;
+}
+
+static int monitor_wakeup_init (struct medusa_monitor *monitor)
+{
+        int rc;
+        medusa_monitor_lock(monitor);
+        rc = monitor_wakeup_init_unlocked(monitor);
+        medusa_monitor_unlock(monitor);
+        return rc;
 }
 
 static int monitor_timer_io_onevent (struct medusa_io *io, unsigned int events, void *context, void *param)
@@ -230,27 +331,35 @@ static int monitor_signal_io_onevent (struct medusa_io *io, unsigned int events,
         return 0;
 }
 
-static int monitor_signal (struct medusa_monitor *monitor, unsigned int reason)
+static int monitor_signal_unlocked (struct medusa_monitor *monitor, unsigned int reason)
 {
         int rc;
-        if (monitor->wakeup.fired == 0) {
-#if defined(__WINDOWS__)
-                rc = send(monitor->wakeup.fds[1], (void *) &reason, sizeof(reason), 0);
-#else
-                rc = write(monitor->wakeup.fds[1], (void *) &reason, sizeof(reason));
-#endif
-                if (rc != sizeof(reason)) {
-                        goto bail;
-                }
-                monitor->wakeup.fired = 1;
-        }
+        int error;
         if (reason == WAKEUP_REASON_LOOP_BREAK) {
                 monitor->running = 0;
         } else if (reason == WAKEUP_REASON_LOOP_CONTINUE) {
                 monitor->running = 1;
         }
+        if (monitor->wakeup.fired == 0 &&
+            monitor->wakeup.valid == 1 &&
+            monitor->wakeup.broken == 0) {
+                do {
+#if defined(__WINDOWS__)
+                        rc = send(monitor->wakeup.fds[1], (void *) &reason, sizeof(reason), 0);
+                        error = (rc < 0) ? medusa_errno_from_socket_error(WSAGetLastError()) : 0;
+#else
+                        rc = write(monitor->wakeup.fds[1], (void *) &reason, sizeof(reason));
+                        error = (rc < 0) ? errno : 0;
+#endif
+                } while (rc < 0 && error == EINTR);
+                if (rc == (int) sizeof(reason)) {
+                        monitor->wakeup.fired = 1;
+                } else {
+                        medusa_errorf("wakeup channel is broken, write failed, rc: %d, errno: %d, it will be recreated", rc, error);
+                        monitor->wakeup.broken = 1;
+                }
+        }
         return 0;
-bail:   return -1;
 }
 
 static int monitor_timer_subject_compare (void *a, void *b)
@@ -565,7 +674,7 @@ static int monitor_process_deletes (struct medusa_monitor *monitor)
                 }
         }
         if (!TAILQ_EMPTY(&monitor->deletes)) {
-                rc = monitor_signal(monitor, WAKEUP_REASON_SUBJECT_DEL);
+                rc = monitor_signal_unlocked(monitor, WAKEUP_REASON_SUBJECT_DEL);
                 if (rc < 0) {
                         goto bail;
                 }
@@ -947,7 +1056,7 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_add_unlocked (struct
         TAILQ_INSERT_TAIL(&monitor->whole, subject, list);
         subject->monitor = monitor;
         subject->flags |= MEDUSA_SUBJECT_FLAG_MOD;
-        rc = monitor_signal(monitor, WAKEUP_REASON_SUBJECT_ADD);
+        rc = monitor_signal_unlocked(monitor, WAKEUP_REASON_SUBJECT_ADD);
         if (rc < 0) {
                 return rc;
         }
@@ -1038,7 +1147,7 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_mod_unlocked (struct
                         subject->flags &= ~MEDUSA_SUBJECT_FLAG_HEAP;
                 }
         }
-        rc = monitor_signal(subject->monitor, WAKEUP_REASON_SUBJECT_MOD);
+        rc = monitor_signal_unlocked(subject->monitor, WAKEUP_REASON_SUBJECT_MOD);
         if (rc < 0) {
                 return rc;
         }
@@ -1122,7 +1231,7 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_del_unlocked (struct
                         subject->flags &= ~MEDUSA_SUBJECT_FLAG_HEAP;
                 }
         }
-        rc = monitor_signal(subject->monitor, WAKEUP_REASON_SUBJECT_DEL);
+        rc = monitor_signal_unlocked(subject->monitor, WAKEUP_REASON_SUBJECT_DEL);
         if (rc < 0) {
                 return rc;
         }
@@ -1344,24 +1453,9 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                 }
         }
         TAILQ_INIT(&monitor->condition.signalled);
-        rc = medusa_pipe2(monitor->wakeup.fds, MEDUSA_PIPE_FLAG_NONBLOCK);
-        if (rc != 0) {
-                medusa_errorf("can not create wakeup fds");
-                goto bail;
-        }
-        monitor->wakeup.io = medusa_io_create(monitor, monitor->wakeup.fds[0], monitor_wakeup_io_onevent, monitor);
-        if (MEDUSA_IS_ERR_OR_NULL(monitor->wakeup.io)) {
-                medusa_errorf("can not create wakeup io");
-                goto bail;
-        }
-        rc = medusa_io_set_events(monitor->wakeup.io, MEDUSA_IO_EVENT_IN);
+        rc = monitor_wakeup_init(monitor);
         if (rc < 0) {
-                medusa_errorf("can not setup wakeup io");
-                goto bail;
-        }
-        rc = medusa_io_set_enabled(monitor->wakeup.io, 1);
-        if (rc < 0) {
-                medusa_errorf("can not enable wakeup io");
+                medusa_errorf("can not initialize wakeup");
                 goto bail;
         }
         if (monitor->timer.backend->fd != NULL) {
@@ -1586,10 +1680,10 @@ __attribute__ ((visibility ("default"))) void medusa_monitor_destroy (struct med
                 monitor->timer.backend->destroy(monitor->timer.backend);
         }
         if (monitor->wakeup.fds[0] >= 0) {
-                close(monitor->wakeup.fds[0]);
+                monitor_wakeup_close(monitor->wakeup.fds[0]);
         }
         if (monitor->wakeup.fds[1] >= 0) {
-                close(monitor->wakeup.fds[1]);
+                monitor_wakeup_close(monitor->wakeup.fds[1]);
         }
         if (monitor->timer.pqueue != NULL) {
                 medusa_pqueue_destroy(monitor->timer.pqueue);
@@ -1620,7 +1714,7 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_break (struct medusa
                 return -EINVAL;
         }
         medusa_monitor_lock(monitor);
-        rc = monitor_signal(monitor, WAKEUP_REASON_LOOP_BREAK);
+        rc = monitor_signal_unlocked(monitor, WAKEUP_REASON_LOOP_BREAK);
         medusa_monitor_unlock(monitor);
         return rc;
 }
@@ -1632,7 +1726,7 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_continue (struct med
                 return -EINVAL;
         }
         medusa_monitor_lock(monitor);
-        rc = monitor_signal(monitor, WAKEUP_REASON_LOOP_CONTINUE);
+        rc = monitor_signal_unlocked(monitor, WAKEUP_REASON_LOOP_CONTINUE);
         medusa_monitor_unlock(monitor);
         return rc;
 }
@@ -1640,6 +1734,7 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_continue (struct med
 __attribute__ ((visibility ("default"))) int medusa_monitor_run_timeout (struct medusa_monitor *monitor, double timeout)
 {
         int rc;
+        int recreated;
         struct timespec *timespec;
         struct timespec _timespec;
         struct timespec remaining;
@@ -1658,6 +1753,25 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_run_timeout (struct 
          * a race where newly added IOs would only activate on the next loop iteration.
          */
 
+        /*
+         * a broken or stalled wakeup channel is replaced here. failing to
+         * replace it is not an error of the loop, it keeps running with a short
+         * timeout and tries again, a wakeup is not able to interrupt it now.
+         */
+        if (monitor->wakeup.stall >= MEDUSA_MONITOR_WAKEUP_STALL_THRESHOLD) {
+                medusa_errorf("wakeup channel is stalled, it will be recreated");
+                monitor->wakeup.broken = 1;
+        }
+        if (monitor->wakeup.broken != 0) {
+                monitor_wakeup_uninit_unlocked(monitor);
+        }
+        recreated = 0;
+        if (monitor->wakeup.valid == 0) {
+                rc = monitor_wakeup_init_unlocked(monitor);
+                if (rc == 0) {
+                        recreated = 1;
+                }
+        }
         rc = monitor_process_deletes(monitor);
         if (rc < 0) {
                 goto bail;
@@ -1681,8 +1795,22 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_run_timeout (struct 
                 goto bail;
         }
 
-        if (monitor->wakeup.fired != 0) {
+        /*
+         * a wakeup that was dropped with the channel that is replaced is not
+         * going to arrive, what it was for is picked up without sleeping.
+         */
+        if (monitor->wakeup.fired != 0 ||
+            recreated != 0) {
                 timeout = 0;
+        }
+        if (monitor->wakeup.fired != 0) {
+                monitor->wakeup.stall += 1;
+        }
+        if (monitor->wakeup.valid == 0) {
+                if (timeout < 0 ||
+                    timeout > MEDUSA_MONITOR_WAKEUP_DEGRADED_TIMEOUT) {
+                        timeout = MEDUSA_MONITOR_WAKEUP_DEGRADED_TIMEOUT;
+                }
         }
         if (timeout < 0) {
                 timespec = NULL;
