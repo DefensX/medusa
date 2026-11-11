@@ -633,7 +633,11 @@ __attribute__ ((visibility ("default"))) int medusa_io_onevent_unlocked (struct 
         }
         if (events & MEDUSA_IO_EVENT_DESTROY) {
                 if (io_get_clodestroy(io)) {
+#if defined(__WINDOWS__)
+                        closesocket(io->fd);
+#else
                         close(io->fd);
+#endif
                 }
 #if defined(MEDUSA_IO_USE_POOL) && (MEDUSA_IO_USE_POOL == 1)
                 medusa_pool_free(io);
