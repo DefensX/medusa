@@ -31,8 +31,9 @@
  *
  * a change made on the loop thread writes no wakeup, and the poll after it
  * does not block. a change from another thread wakes a loop that is blocked
- * in poll, through a pipe where there is one, or within the wakeup interval
- * where there is none (windows, or MEDUSA_MONITOR_WAKEUP_NONE).
+ * in poll, through the poll backend where it can (iocp), through a pipe where
+ * there is one, or within the wakeup interval where there is none (windows
+ * wsapoll, or MEDUSA_MONITOR_WAKEUP_NONE).
  */
 
 /* long enough to tell a bounded poll from a poll that did not block, also with a 15.6ms tick */
@@ -58,6 +59,7 @@ static const unsigned int g_polls[] = {
         MEDUSA_MONITOR_POLL_SELECT,
 #if defined(__WINDOWS__)
         MEDUSA_MONITOR_POLL_WSAPOLL,
+        MEDUSA_MONITOR_POLL_IOCP,
 #endif
 };
 
@@ -65,6 +67,7 @@ static const unsigned int g_wakeups[] = {
         MEDUSA_MONITOR_WAKEUP_DEFAULT,
         MEDUSA_MONITOR_WAKEUP_PIPE,
         MEDUSA_MONITOR_WAKEUP_NONE,
+        MEDUSA_MONITOR_WAKEUP_BACKEND,
 };
 
 static double now (void)
@@ -191,17 +194,45 @@ static int helper_start (pthread_t *thread, struct helper *helper, struct medusa
         return pthread_create(thread, NULL, helper_routine, helper);
 }
 
-/* the wakeup a monitor resolves to */
-static unsigned int expected_wakeup (unsigned int wakeup)
+static int backend_wakes (unsigned int poll)
 {
-        if (wakeup == MEDUSA_MONITOR_WAKEUP_DEFAULT) {
 #if defined(__WINDOWS__)
-                return MEDUSA_MONITOR_WAKEUP_NONE;
+        return (poll == MEDUSA_MONITOR_POLL_DEFAULT || poll == MEDUSA_MONITOR_POLL_IOCP);
 #else
-                return MEDUSA_MONITOR_WAKEUP_PIPE;
+        (void) poll;
+        return 0;
 #endif
+}
+
+/* the wakeup a monitor resolves to, -1 if it can not be created */
+static int expected_wakeup (unsigned int poll, unsigned int wakeup)
+{
+        switch (wakeup) {
+                case MEDUSA_MONITOR_WAKEUP_DEFAULT:
+                        if (backend_wakes(poll)) {
+                                return MEDUSA_MONITOR_WAKEUP_BACKEND;
+                        }
+#if defined(__WINDOWS__)
+                        return MEDUSA_MONITOR_WAKEUP_NONE;
+#else
+                        return MEDUSA_MONITOR_WAKEUP_PIPE;
+#endif
+                case MEDUSA_MONITOR_WAKEUP_PIPE:
+#if defined(__WINDOWS__)
+                        return -1;
+#else
+                        return MEDUSA_MONITOR_WAKEUP_PIPE;
+#endif
+                case MEDUSA_MONITOR_WAKEUP_BACKEND:
+                        return backend_wakes(poll) ? MEDUSA_MONITOR_WAKEUP_BACKEND : -1;
         }
         return wakeup;
+}
+
+/* a wakeup that ends a blocked poll right away, not after the interval */
+static int immediate (unsigned int wakeup)
+{
+        return (wakeup == MEDUSA_MONITOR_WAKEUP_PIPE || wakeup == MEDUSA_MONITOR_WAKEUP_BACKEND);
 }
 
 /* let pending changes be applied, so the next poll would block */
@@ -313,7 +344,7 @@ static int check_remote_break (struct medusa_monitor *monitor, unsigned int wake
                 fprintf(stderr, "    medusa_monitor_run_timeout did not break, rc: %d\n", rc);
                 return -1;
         }
-        if (wakeup == MEDUSA_MONITOR_WAKEUP_PIPE) {
+        if (immediate(wakeup)) {
                 if (runs != 1) {
                         fprintf(stderr, "    medusa_monitor_run_timeout returned without a reason, runs: %d\n", runs);
                         return -1;
@@ -390,7 +421,7 @@ static int check_remote_condition (struct medusa_monitor *monitor, unsigned int 
                 fprintf(stderr, "    condition is not delivered, signalled: %d\n", signalled);
                 goto bail;
         }
-        if (late > ((wakeup == MEDUSA_MONITOR_WAKEUP_PIPE) ? 0 : INTERVAL) + SLACK) {
+        if (late > (immediate(wakeup) ? 0 : INTERVAL) + SLACK) {
                 fprintf(stderr, "    condition is delivered late, late: %.3f\n", late);
                 goto bail;
         }
@@ -414,7 +445,7 @@ static int check_idle (struct medusa_monitor *monitor, unsigned int wakeup)
         if (settle(monitor) != 0) {
                 return -1;
         }
-        if (wakeup == MEDUSA_MONITOR_WAKEUP_PIPE) {
+        if (immediate(wakeup)) {
                 start = now();
                 rc = medusa_monitor_run_timeout(monitor, 0.5);
                 elapsed = now() - start;
@@ -455,16 +486,16 @@ static int check_idle (struct medusa_monitor *monitor, unsigned int wakeup)
         return 0;
 }
 
-#if !defined(__WINDOWS__)
-
-/* wakeups from another thread while the loop is not polling are merged into one byte */
-static int check_merged (struct medusa_monitor *monitor)
+/* wakeups from another thread while the loop is not polling are merged into one */
+static int check_merged (struct medusa_monitor *monitor, unsigned int wakeup)
 {
         int rc;
         double start;
         double elapsed;
         pthread_t thread;
         struct helper helper;
+
+        (void) wakeup;
 
         if (settle(monitor) != 0) {
                 return -1;
@@ -478,20 +509,24 @@ static int check_merged (struct medusa_monitor *monitor)
                 fprintf(stderr, "    medusa_monitor_continue failed, rc: %d\n", helper.rc);
                 return -1;
         }
-        if (queued(monitor) != (int) sizeof(unsigned int)) {
+#if !defined(__WINDOWS__)
+        if (wakeup == MEDUSA_MONITOR_WAKEUP_PIPE && queued(monitor) != (int) sizeof(unsigned int)) {
                 fprintf(stderr, "    wakeups are not merged, queued: %d\n", queued(monitor));
                 return -1;
         }
+#endif
         rc = medusa_monitor_run_timeout(monitor, 10.0);
         if (rc != 1) {
                 fprintf(stderr, "    medusa_monitor_run_timeout failed, rc: %d\n", rc);
                 return -1;
         }
-        if (queued(monitor) != 0) {
+#if !defined(__WINDOWS__)
+        if (wakeup == MEDUSA_MONITOR_WAKEUP_PIPE && queued(monitor) != 0) {
                 fprintf(stderr, "    wakeup is not read, queued: %d\n", queued(monitor));
                 return -1;
         }
-        /* the wakeup is consumed, the next poll blocks */
+#endif
+        /* one wakeup is consumed, there is no other left, the next poll blocks */
         start = now();
         rc = medusa_monitor_run_timeout(monitor, 0.5);
         elapsed = now() - start;
@@ -500,27 +535,30 @@ static int check_merged (struct medusa_monitor *monitor)
                 return -1;
         }
         if (elapsed < 0.4) {
-                fprintf(stderr, "    loop did not block after the wakeup is read, elapsed: %.3f\n", elapsed);
+                fprintf(stderr, "    loop did not block after the wakeup is consumed, elapsed: %.3f\n", elapsed);
                 return -1;
         }
+#if !defined(__WINDOWS__)
         /* and a new wakeup is written once the loop has read the last one */
-        if (helper_start(&thread, &helper, monitor, ACTION_CONTINUE, 0) != 0) {
-                fprintf(stderr, "    can not create thread\n");
-                return -1;
+        if (wakeup == MEDUSA_MONITOR_WAKEUP_PIPE) {
+                if (helper_start(&thread, &helper, monitor, ACTION_CONTINUE, 0) != 0) {
+                        fprintf(stderr, "    can not create thread\n");
+                        return -1;
+                }
+                pthread_join(thread, NULL);
+                if (queued(monitor) != (int) sizeof(unsigned int)) {
+                        fprintf(stderr, "    wakeup is not written again, queued: %d\n", queued(monitor));
+                        return -1;
+                }
         }
-        pthread_join(thread, NULL);
-        if (queued(monitor) != (int) sizeof(unsigned int)) {
-                fprintf(stderr, "    wakeup is not written again, queued: %d\n", queued(monitor));
-                return -1;
-        }
+#endif
         return 0;
 }
-
-#endif
 
 static int test_wakeup (unsigned int poll, unsigned int wakeup)
 {
         int rc;
+        int expected;
         unsigned int type;
         struct medusa_monitor *monitor;
         struct medusa_monitor_init_options options;
@@ -534,26 +572,25 @@ static int test_wakeup (unsigned int poll, unsigned int wakeup)
         options.wakeup.type     = wakeup;
         options.wakeup.interval = INTERVAL;
 
+        expected = expected_wakeup(poll, wakeup);
         monitor = medusa_monitor_create_with_options(&options);
-#if defined(__WINDOWS__)
-        if (wakeup == MEDUSA_MONITOR_WAKEUP_PIPE) {
+        if (expected < 0) {
                 if (!MEDUSA_IS_ERR_OR_NULL(monitor)) {
-                        fprintf(stderr, "    a pipe wakeup is created on windows\n");
+                        fprintf(stderr, "    a monitor is created with a wakeup it can not have\n");
                         medusa_monitor_destroy(monitor);
                         return -1;
                 }
                 fprintf(stderr, "    not supported\n");
                 return 0;
         }
-#endif
         if (MEDUSA_IS_ERR_OR_NULL(monitor)) {
                 fprintf(stderr, "    medusa_monitor_create failed\n");
                 return -1;
         }
 
         type = medusa_monitor_get_wakeup_type(monitor);
-        if (type != expected_wakeup(wakeup)) {
-                fprintf(stderr, "    wakeup is: %s, expected: %s\n", medusa_monitor_wakeup_type_string(type), medusa_monitor_wakeup_type_string(expected_wakeup(wakeup)));
+        if ((int) type != expected) {
+                fprintf(stderr, "    wakeup is: %s, expected: %s\n", medusa_monitor_wakeup_type_string(type), medusa_monitor_wakeup_type_string(expected));
                 goto bail;
         }
 #if !defined(__WINDOWS__)
@@ -583,15 +620,13 @@ static int test_wakeup (unsigned int poll, unsigned int wakeup)
                 fprintf(stderr, "    check idle failed\n");
                 goto bail;
         }
-#if !defined(__WINDOWS__)
-        if (type == MEDUSA_MONITOR_WAKEUP_PIPE) {
-                rc = check_merged(monitor);
+        if (immediate(type)) {
+                rc = check_merged(monitor, type);
                 if (rc != 0) {
                         fprintf(stderr, "    check merged failed\n");
                         goto bail;
                 }
         }
-#endif
 
         medusa_monitor_destroy(monitor);
         return 0;

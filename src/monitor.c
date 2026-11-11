@@ -63,6 +63,7 @@
 #include "poll-poll.h"
 #include "poll-select.h"
 #include "poll-wsapoll.h"
+#include "poll-iocp.h"
 #include "poll-backend.h"
 
 #include "signal-sigaction.h"
@@ -191,9 +192,21 @@ static int monitor_wakeup_init (struct medusa_monitor *monitor, const struct med
                 return 0;
         }
         if (options->wakeup.type != MEDUSA_MONITOR_WAKEUP_DEFAULT &&
-            options->wakeup.type != MEDUSA_MONITOR_WAKEUP_PIPE) {
+            options->wakeup.type != MEDUSA_MONITOR_WAKEUP_PIPE &&
+            options->wakeup.type != MEDUSA_MONITOR_WAKEUP_BACKEND) {
                 medusa_errorf("invalid wakeup type: %d", options->wakeup.type);
                 return -EINVAL;
+        }
+        if (options->wakeup.type == MEDUSA_MONITOR_WAKEUP_DEFAULT ||
+            options->wakeup.type == MEDUSA_MONITOR_WAKEUP_BACKEND) {
+                if (monitor->poll.backend->wakeup != NULL) {
+                        monitor->wakeup.type = MEDUSA_MONITOR_WAKEUP_BACKEND;
+                        return 0;
+                }
+                if (options->wakeup.type == MEDUSA_MONITOR_WAKEUP_BACKEND) {
+                        medusa_errorf("poll backend: %s can not wake up", monitor->poll.backend->name);
+                        return -ENOTSUP;
+                }
         }
         rc = medusa_pipe2(monitor->wakeup.fds, MEDUSA_PIPE_FLAG_NONBLOCK);
         if (rc != 0) {
@@ -282,12 +295,22 @@ static int monitor_signal_unlocked (struct medusa_monitor *monitor, unsigned int
                 monitor->running = 1;
         }
         monitor->wakeup.pending = 1;
-        if (monitor->wakeup.type != MEDUSA_MONITOR_WAKEUP_PIPE ||
+        if ((monitor->wakeup.type != MEDUSA_MONITOR_WAKEUP_PIPE &&
+             monitor->wakeup.type != MEDUSA_MONITOR_WAKEUP_BACKEND) ||
             monitor->wakeup.fired == 1) {
                 return 0;
         }
         if (monitor->owner.valid == 1 &&
             pthread_equal(monitor->owner.thread, pthread_self())) {
+                return 0;
+        }
+        if (monitor->wakeup.type == MEDUSA_MONITOR_WAKEUP_BACKEND) {
+                rc = monitor->poll.backend->wakeup(monitor->poll.backend);
+                if (rc < 0) {
+                        medusa_errorf("can not wake up poll backend, rc: %d", rc);
+                        return rc;
+                }
+                monitor->wakeup.fired = 1;
                 return 0;
         }
         while (1) {
@@ -1264,6 +1287,15 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                                 break;
                         }
 #endif
+#if defined(MEDUSA_POLL_IOCP_ENABLE) && (MEDUSA_POLL_IOCP_ENABLE == 1)
+                        struct medusa_monitor_iocp_init_options iocp_init_options;
+                        iocp_init_options.onevent = monitor_poll_io_onevent;
+                        iocp_init_options.context = monitor;
+                        monitor->poll.backend = medusa_monitor_iocp_create(&iocp_init_options);
+                        if (monitor->poll.backend != NULL) {
+                                break;
+                        }
+#endif
 #if defined(MEDUSA_POLL_WSAPOLL_ENABLE) && (MEDUSA_POLL_WSAPOLL_ENABLE == 1)
                         struct medusa_monitor_wsapoll_init_options wsapoll_init_options;
                         wsapoll_init_options.onevent = monitor_poll_io_onevent;
@@ -1317,6 +1349,13 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                 wsapoll_init_options.onevent = monitor_poll_io_onevent;
                 wsapoll_init_options.context = monitor;
                 monitor->poll.backend = medusa_monitor_wsapoll_create(&wsapoll_init_options);
+#endif
+#if defined(MEDUSA_POLL_IOCP_ENABLE) && (MEDUSA_POLL_IOCP_ENABLE == 1)
+        } else if (options->poll.type == MEDUSA_MONITOR_POLL_IOCP) {
+                struct medusa_monitor_iocp_init_options iocp_init_options;
+                iocp_init_options.onevent = monitor_poll_io_onevent;
+                iocp_init_options.context = monitor;
+                monitor->poll.backend = medusa_monitor_iocp_create(&iocp_init_options);
 #endif
         } else {
                 medusa_errorf("invalid poll type: %d", options->poll.type);
@@ -1775,6 +1814,10 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_run_timeout (struct 
 
         medusa_monitor_lock(monitor);
 
+        if (monitor->wakeup.type == MEDUSA_MONITOR_WAKEUP_BACKEND) {
+                monitor->wakeup.fired = 0;
+        }
+
         if (rc < 0) {
                 goto bail;
         }
@@ -1863,6 +1906,10 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_poll_type_value (con
             strcasecmp(value, "WSAPOLL") == 0) {
                 return MEDUSA_MONITOR_POLL_WSAPOLL;
         }
+        if (strcasecmp(value, "MEDUSA_MONITOR_POLL_IOCP") == 0 ||
+            strcasecmp(value, "IOCP") == 0) {
+                return MEDUSA_MONITOR_POLL_IOCP;
+        }
         return -EINVAL;
 }
 
@@ -1885,6 +1932,9 @@ __attribute__ ((visibility ("default"))) const char * medusa_monitor_poll_type_s
         }
         if (type == MEDUSA_MONITOR_POLL_WSAPOLL) {
                 return "MEDUSA_MONITOR_POLL_WSAPOLL";
+        }
+        if (type == MEDUSA_MONITOR_POLL_IOCP) {
+                return "MEDUSA_MONITOR_POLL_IOCP";
         }
         return "MEDUSA_MONITOR_POLL_UNKNOWN";
 }
@@ -1974,6 +2024,10 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_wakeup_type_value (c
             strcasecmp(value, "NONE") == 0) {
                 return MEDUSA_MONITOR_WAKEUP_NONE;
         }
+        if (strcasecmp(value, "MEDUSA_MONITOR_WAKEUP_BACKEND") == 0 ||
+            strcasecmp(value, "BACKEND") == 0) {
+                return MEDUSA_MONITOR_WAKEUP_BACKEND;
+        }
         return -EINVAL;
 }
 
@@ -1987,6 +2041,9 @@ __attribute__ ((visibility ("default"))) const char * medusa_monitor_wakeup_type
         }
         if (type == MEDUSA_MONITOR_WAKEUP_NONE) {
                 return "MEDUSA_MONITOR_WAKEUP_NONE";
+        }
+        if (type == MEDUSA_MONITOR_WAKEUP_BACKEND) {
+                return "MEDUSA_MONITOR_WAKEUP_BACKEND";
         }
         return "MEDUSA_MONITOR_WAKEUP_UNKNOWN";
 }

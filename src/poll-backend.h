@@ -13,6 +13,7 @@ struct medusa_poll_backend {
         int (*mod) (struct medusa_poll_backend *backend, struct medusa_io *io);
         int (*del) (struct medusa_poll_backend *backend, struct medusa_io *io);
         int (*run) (struct medusa_poll_backend *backend, struct timespec *timespec);
+        int (*wakeup) (struct medusa_poll_backend *backend);
         void (*destroy) (struct medusa_poll_backend *backend);
         struct medusa_monitor *monitor;
 };
