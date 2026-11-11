@@ -7,13 +7,9 @@
 
 #include <pthread.h>
 
-#include "medusa/monitor.h"
+#include "watchdog.h"
 
-static void alarm_handler (int sig)
-{
-        (void) sig;
-        abort();
-}
+#include "medusa/monitor.h"
 
 struct thread_arg {
         int rc;
@@ -42,9 +38,8 @@ int main (int argc, char *argv[])
         (void) argv;
 
         srand(time(NULL));
-        signal(SIGALRM, alarm_handler);
 
-        alarm(5);
+        watchdog_arm(5, NULL);
 
         monitor = medusa_monitor_create_with_options(NULL);
         if (monitor == NULL) {

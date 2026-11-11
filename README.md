@@ -42,7 +42,7 @@ or
 
     cd medusa
     MEDUSA_BUILD_EXAMPLES=y \
-    MEDUSA_BUILD_TESTS=y \
+    MEDUSA_BUILD_TEST=y \
     make -j 8
     make -j 8 tests
 
@@ -69,7 +69,7 @@ or
     CFLAGS="-DWINVER=_WIN32_WINNT_WIN10 -D_WIN32_WINNT=_WIN32_WINNT_WIN10 -I`pwd`/3rdparty/install_mingw64/usr/local/include" \
 	LDFLAGS="-L`pwd`/3rdparty/install_mingw64/usr/local/lib" \
     MEDUSA_BUILD_EXAMPLES=y \
-    MEDUSA_BUILD_TESTS=y \
+    MEDUSA_BUILD_TEST=y \
     CROSS_COMPILE_PREFIX=x86_64-w64-mingw32- \
     make -j 8
 
@@ -91,7 +91,7 @@ or
     CFLAGS="-I`pwd`/3rdparty/install_darwin64/usr/local/include" \
 	LDFLAGS="-L`pwd`/3rdparty/install_darwin64/usr/local/lib" \
     MEDUSA_BUILD_EXAMPLES=y \
-    MEDUSA_BUILD_TESTS=y \
+    MEDUSA_BUILD_TEST=y \
     MEDUSA_LIBMEDUSA_TARGET_SO=n \
     make -j 8
 

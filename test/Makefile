@@ -13,7 +13,11 @@ all:
 
 define test-defaults
 	$1_files-y = \
-		$1.c
+		$1.c \
+		watchdog.c
+
+	$1_files-${__WINDOWS__} += \
+		test-windows.c
 
 	$1_includes-y = \
 		../dist/include
@@ -47,7 +51,8 @@ endef
 
 define test_event-defaults
 	$1_files-y = \
-		$1.c
+		$1.c \
+		watchdog.c
 
 	$1_ldflags-y = \
 		-levent \

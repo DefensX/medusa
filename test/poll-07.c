@@ -15,7 +15,7 @@
  *
  * and MEDUSA_POLL_IOCP_DISABLE makes the default fall back to wsapoll.
  *
- * a watchdog names the step that takes too long and exits with 3.
+ * the shared watchdog names the step that takes too long.
  */
 
 #include <stdio.h>
@@ -34,7 +34,9 @@
 #include "medusa/io.h"
 #include "medusa/monitor.h"
 
-#define STEP_TIMEOUT    15.0
+#include "watchdog.h"
+
+#define STEP_TIMEOUT    15
 #define MANY            100
 
 enum {
@@ -42,9 +44,6 @@ enum {
         MODE_IOCP_SLOW,
         MODE_WSAPOLL
 };
-
-static const char * volatile g_step = "start";
-static volatile double g_deadline;
 
 static double now (void)
 {
@@ -57,23 +56,8 @@ static double now (void)
 
 static void step (const char *name)
 {
-        g_step     = name;
-        g_deadline = now() + STEP_TIMEOUT;
+        watchdog_arm(STEP_TIMEOUT, name);
         fprintf(stderr, "    %s\n", name);
-}
-
-static void * watchdog_routine (void *arg)
-{
-        (void) arg;
-        while (1) {
-                Sleep(100);
-                if (g_deadline > 0 && now() > g_deadline) {
-                        fprintf(stderr, "step: %s timed out\n", g_step);
-                        fflush(stderr);
-                        _exit(3);
-                }
-        }
-        return NULL;
 }
 
 static const char * mode_string (int mode)
@@ -366,6 +350,20 @@ static int test_echo (int mode)
         step("echo, peer half close");
         shutdown(client, SD_SEND);
         if (run_until(monitor, &echo.closed, 5.0) != 0) {
+                char c;
+                /* tells a backend that did not report it from a fin that never arrived */
+                rc = recv((SOCKET) medusa_io_get_fd(echo.server), &c, 1, MSG_PEEK);
+                if (rc == 0) {
+                        fprintf(stderr, "    fin arrived on the server socket, it is not reported\n");
+                        rc = -1;
+                } else if (rc < 0 && WSAGetLastError() == WSAEWOULDBLOCK) {
+                        /* nothing a backend can report, the network path does not pass a half close */
+                        fprintf(stderr, "    skipped, fin did not arrive on the server socket, is a filter driver proxying loopback\n");
+                        rc = 0;
+                } else {
+                        fprintf(stderr, "    server socket peek, rc: %d, error: %d\n", rc, WSAGetLastError());
+                        rc = -1;
+                }
                 goto out;
         }
         if (echo.failed) {
@@ -438,7 +436,8 @@ static int counter_onevent (struct medusa_io *io, unsigned int events, void *con
 static int test_reset (int mode)
 {
         int rc;
-        volatile int seen;
+        int seen;
+        double end;
         SOCKET client;
         SOCKET server;
         struct linger linger;
@@ -471,12 +470,13 @@ static int test_reset (int mode)
         setsockopt(client, SOL_SOCKET, SO_LINGER, (const char *) &linger, sizeof(linger));
         closesocket(client);
         seen = 0;
+        end  = now() + 10.0;
         while (seen == 0) {
                 if (run_for(monitor, 0.05) != 0) {
                         goto out;
                 }
                 seen = (counter.hup || counter.err || counter.reset);
-                if (now() > g_deadline - 5.0) {
+                if (now() > end) {
                         break;
                 }
         }
@@ -747,7 +747,7 @@ static int test_local_close (int mode)
         if (run_for(monitor, 0.3) != 0) {
                 goto close;
         }
-        if (mode == MODE_IOCP && counter.nval != 1) {
+        if (mode != MODE_WSAPOLL && counter.nval != 1) {
                 fprintf(stderr, "    closed socket is reported more than once, nval: %d\n", counter.nval);
                 goto close;
         }
@@ -765,6 +765,7 @@ static int test_many (int mode)
         int i;
         int rc;
         int length;
+        double end;
         volatile int total;
         SOCKET sender;
         SOCKET sockets[MANY];
@@ -805,11 +806,12 @@ static int test_many (int mode)
                         goto out;
                 }
         }
+        end = now() + 10.0;
         while (total < MANY) {
                 if (run_for(monitor, 0.05) != 0) {
                         goto out;
                 }
-                if (now() > g_deadline - 5.0) {
+                if (now() > end) {
                         fprintf(stderr, "    out is reported for %d of %d sockets\n", total, MANY);
                         goto out;
                 }
@@ -827,8 +829,12 @@ static int test_many (int mode)
                 goto out;
         }
         for (i = 0; i < MANY; i++) {
-                sendto(sender, "x", 1, 0, (struct sockaddr *) &addresses[i], sizeof(addresses[i]));
+                if (sendto(sender, "x", 1, 0, (struct sockaddr *) &addresses[i], sizeof(addresses[i])) != 1) {
+                        fprintf(stderr, "    sendto failed, error: %d\n", WSAGetLastError());
+                        goto out;
+                }
         }
+        end = now() + 10.0;
         while (1) {
                 int received;
                 received = 0;
@@ -838,8 +844,24 @@ static int test_many (int mode)
                 if (received == MANY) {
                         break;
                 }
-                if (now() > g_deadline - 5.0) {
-                        fprintf(stderr, "    in is reported for %d of %d sockets\n", received, MANY);
+                if (now() > end) {
+                        int waiting;
+                        u_long pending;
+                        /* tells a backend that did not report it from a datagram that never arrived */
+                        waiting = 0;
+                        for (i = 0; i < MANY; i++) {
+                                pending = 0;
+                                if (counters[i].in == 0 && ioctlsocket(sockets[i], FIONREAD, &pending) == 0 && pending > 0) {
+                                        waiting += 1;
+                                }
+                        }
+                        if (received == 0 && waiting == 0) {
+                                /* nothing a backend can report, the network path drops loopback udp */
+                                fprintf(stderr, "    skipped, no datagram arrived, is a filter driver dropping loopback udp\n");
+                                rc = 0;
+                                goto out;
+                        }
+                        fprintf(stderr, "    in is reported for %d of %d sockets, %d of the others have a datagram waiting\n", received, MANY, waiting);
                         goto out;
                 }
                 if (run_for(monitor, 0.05) != 0) {
@@ -976,14 +998,12 @@ int main (int argc, char *argv[])
 {
         int mode;
         int failed;
-        pthread_t watchdog;
         WSADATA wsadata;
 
         (void) argc;
         (void) argv;
 
         WSAStartup(MAKEWORD(2, 2), &wsadata);
-        pthread_create(&watchdog, NULL, watchdog_routine, NULL);
 
         failed = 0;
         failed += (test_default() != 0);
@@ -999,7 +1019,7 @@ int main (int argc, char *argv[])
                 failed += (test_reuse(mode) != 0);
         }
         failed += (test_disable() != 0);
-        g_deadline = 0;
+        watchdog_arm(0, NULL);
 
         if (failed) {
                 fprintf(stderr, "failed: %d\n", failed);

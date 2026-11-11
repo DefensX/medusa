@@ -73,7 +73,7 @@ static int test_buffer (unsigned int type, unsigned int count)
                 }
                 rc = memcmp(data + j, iovecs[i].iov_base, iovecs[i].iov_len);
                 if (rc != 0) {
-                        fprintf(stderr, "data mismatch @ i: %d / %d, j: %d / %d, iov: %ld\n", i, niovecs, j, count, iovecs[i].iov_len);
+                        fprintf(stderr, "data mismatch @ i: %d / %d, j: %d / %d, iov: %zu\n", i, niovecs, j, count, iovecs[i].iov_len);
                         return -1;
                 }
                 j += iovecs[i].iov_len;

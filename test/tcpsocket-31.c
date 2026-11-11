@@ -10,15 +10,22 @@
 #include <signal.h>
 #include <errno.h>
 
+#if defined(__WINDOWS__)
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#endif
 
 #if defined(MEDUSA_TEST_TCPSOCKET_SSL) && (MEDUSA_TEST_TCPSOCKET_SSL == 1)
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 #endif
+
+#include "watchdog.h"
 
 #include "medusa/error.h"
 #include "medusa/buffer.h"
@@ -33,16 +40,27 @@ static const unsigned int g_polls[] = {
         MEDUSA_MONITOR_POLL_DEFAULT,
 #if defined(__LINUX__)
         MEDUSA_MONITOR_POLL_EPOLL,
+        MEDUSA_MONITOR_POLL_POLL,
 #endif
 #if defined(__APPLE__)
         MEDUSA_MONITOR_POLL_KQUEUE,
-#endif
         MEDUSA_MONITOR_POLL_POLL,
+#endif
         MEDUSA_MONITOR_POLL_SELECT,
 #if defined(__WINDOWS__)
         MEDUSA_MONITOR_POLL_WSAPOLL,
+        MEDUSA_MONITOR_POLL_IOCP
 #endif
 };
+
+static void socket_close (int fd)
+{
+#if defined(__WINDOWS__)
+        closesocket(fd);
+#else
+        close(fd);
+#endif
+}
 
 static int tcpsocket_client_onevent (struct medusa_tcpsocket *tcpsocket, unsigned int events, void *context, void *param)
 {
@@ -218,7 +236,7 @@ static int test_poll (unsigned int poll)
         }
 
         val = 1;
-        rc = setsockopt(bind_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
+        rc = setsockopt(bind_fd, SOL_SOCKET, SO_REUSEADDR, (const void *) &val, sizeof(val));
         if (rc != 0) {
                 fprintf(stderr, "can not set reuseaddr on tcp socket\n");
                 goto bail;
@@ -453,25 +471,19 @@ static int test_poll (unsigned int poll)
 
         medusa_monitor_destroy(monitor);
 
-        close(bind_fd);
-        close(connect_fd);
+        socket_close(bind_fd);
+        socket_close(connect_fd);
         return 0;
 bail:   if (monitor != NULL) {
                 medusa_monitor_destroy(monitor);
         }
         if (bind_fd >= 0) {
-                close(bind_fd);
+                socket_close(bind_fd);
         }
         if (connect_fd >= 0) {
-                close(connect_fd);
+                socket_close(connect_fd);
         }
         return -1;
-}
-
-static void sigalarm_handler (int sig)
-{
-        (void) sig;
-        abort();
 }
 
 static void sigint_handler (int sig)
@@ -489,11 +501,10 @@ int main (int argc, char *argv[])
         (void) argv;
 
         srand(time(NULL));
-        signal(SIGALRM, sigalarm_handler);
         signal(SIGINT, sigint_handler);
 
         for (i = 0; i < sizeof(g_polls) / sizeof(g_polls[0]); i++) {
-                alarm(5);
+                watchdog_arm(5, NULL);
 
                 fprintf(stderr, "testing poll: %d\n", g_polls[i]);
                 rc = test_poll(g_polls[i]);

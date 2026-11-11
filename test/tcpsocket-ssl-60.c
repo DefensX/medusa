@@ -12,6 +12,8 @@
 #include <openssl/ssl.h>
 #include <openssl/err.h>
 
+#include "watchdog.h"
+
 #include "medusa/error.h"
 #include "medusa/tcpsocket.h"
 #include "medusa/monitor.h"
@@ -20,14 +22,16 @@ static const unsigned int g_polls[] = {
         MEDUSA_MONITOR_POLL_DEFAULT,
 #if defined(__LINUX__)
         MEDUSA_MONITOR_POLL_EPOLL,
+        MEDUSA_MONITOR_POLL_POLL,
 #endif
 #if defined(__APPLE__)
         MEDUSA_MONITOR_POLL_KQUEUE,
-#endif
         MEDUSA_MONITOR_POLL_POLL,
+#endif
         MEDUSA_MONITOR_POLL_SELECT,
 #if defined(__WINDOWS__)
         MEDUSA_MONITOR_POLL_WSAPOLL,
+        MEDUSA_MONITOR_POLL_IOCP
 #endif
 };
 
@@ -360,12 +364,6 @@ bail:   if (monitor != NULL) {
         return -1;
 }
 
-static void sigalarm_handler (int sig)
-{
-        (void) sig;
-        abort();
-}
-
 static void sigint_handler (int sig)
 {
         (void) sig;
@@ -382,13 +380,12 @@ int main (int argc, char *argv[])
         (void) argv;
 
         srand(time(NULL));
-        signal(SIGALRM, sigalarm_handler);
         signal(SIGINT, sigint_handler);
 
         SSL_library_init();
         SSL_load_error_strings();
 
-        alarm(5);
+        watchdog_arm(5, NULL);
         rc = test_alpn_parse();
         if (rc != 0) {
                 fprintf(stderr, "  failed\n");
@@ -397,7 +394,7 @@ int main (int argc, char *argv[])
 
         for (i = 0; i < sizeof(g_polls) / sizeof(g_polls[0]); i++) {
                 for (j = 0; j < sizeof(g_alpns) / sizeof(g_alpns[0]); j++) {
-                        alarm(5);
+                        watchdog_arm(5, NULL);
 
                         fprintf(stderr, "testing poll: %d, alpn server: %s, client: %s\n", g_polls[i], (g_alpns[j].server != NULL) ? g_alpns[j].server : "(null)", (g_alpns[j].client != NULL) ? g_alpns[j].client : "(null)");
                         rc = test_poll(g_polls[i], &g_alpns[j]);

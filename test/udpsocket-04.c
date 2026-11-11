@@ -25,10 +25,17 @@
 #include <signal.h>
 #include <errno.h>
 
+#if defined(__WINDOWS__)
+#include <winsock2.h>
+#include <ws2tcpip.h>
+#else
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#endif
+
+#include "watchdog.h"
 
 #include "medusa/error.h"
 #include "medusa/udpsocket.h"
@@ -38,14 +45,16 @@ static const unsigned int g_polls[] = {
         MEDUSA_MONITOR_POLL_DEFAULT,
 #if defined(__LINUX__)
         MEDUSA_MONITOR_POLL_EPOLL,
+        MEDUSA_MONITOR_POLL_POLL,
 #endif
 #if defined(__APPLE__)
         MEDUSA_MONITOR_POLL_KQUEUE,
-#endif
         MEDUSA_MONITOR_POLL_POLL,
+#endif
         MEDUSA_MONITOR_POLL_SELECT,
 #if defined(__WINDOWS__)
         MEDUSA_MONITOR_POLL_WSAPOLL,
+        MEDUSA_MONITOR_POLL_IOCP
 #endif
 };
 
@@ -72,6 +81,15 @@ struct context {
         int failed;
 };
 
+static void socket_close (int fd)
+{
+#if defined(__WINDOWS__)
+        closesocket(fd);
+#else
+        close(fd);
+#endif
+}
+
 static int packet_length (int i)
 {
         return 1000 + (i % 400);
@@ -94,7 +112,7 @@ static int packet_send (struct context *context)
         for (rc = 0; rc < length; rc++) {
                 buffer[rc] = packet_byte(i, rc);
         }
-        rc = send(context->fd, buffer, length, 0);
+        rc = send(context->fd, (const void *) buffer, length, 0);
         if (rc != length) {
                 fprintf(stderr, "  send failed, rc: %d, length: %d\n", rc, length);
                 return -1;
@@ -310,11 +328,11 @@ static int test_policy (unsigned int poll, int policy)
                 goto bail;
         }
 
-        close(context.fd);
+        socket_close(context.fd);
         medusa_monitor_destroy(monitor);
         return 0;
 bail:   if (context.fd >= 0) {
-                close(context.fd);
+                socket_close(context.fd);
         }
         if (monitor != NULL) {
                 medusa_monitor_destroy(monitor);
@@ -336,12 +354,6 @@ static int test_poll (unsigned int poll)
         return 0;
 }
 
-static void alarm_handler (int sig)
-{
-        (void) sig;
-        abort();
-}
-
 int main (int argc, char *argv[])
 {
         int rc;
@@ -351,10 +363,9 @@ int main (int argc, char *argv[])
         (void) argv;
 
         srand(time(NULL));
-        signal(SIGALRM, alarm_handler);
 
         for (i = 0; i < sizeof(g_polls) / sizeof(g_polls[0]); i++) {
-                alarm(60);
+                watchdog_arm(60, NULL);
 
                 fprintf(stderr, "testing poll: %d\n", g_polls[i]);
                 rc = test_poll(g_polls[i]);

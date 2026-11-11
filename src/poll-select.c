@@ -180,6 +180,16 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
         memcpy(&internal->_rfds, &internal->rfds, sizeof(internal->rfds));
         memcpy(&internal->_wfds, &internal->wfds, sizeof(internal->wfds));
         memcpy(&internal->_efds, &internal->efds, sizeof(internal->efds));
+#if defined(__WINDOWS__)
+        if (internal->_rfds.fd_count == 0 &&
+            internal->_wfds.fd_count == 0 &&
+            internal->_efds.fd_count == 0) {
+                /* select fails without sockets on windows */
+                Sleep((timeval == NULL) ? INFINITE : (DWORD) (timeval->tv_sec * 1000 + timeval->tv_usec / 1000));
+                count = 0;
+                goto out;
+        }
+#endif
         count = select(internal->mfds + 1, &internal->_rfds, &internal->_wfds, &internal->_efds, timeval);
         if (count == 0) {
                 goto out;

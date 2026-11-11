@@ -17,6 +17,8 @@
 #include <sys/stat.h>
 #endif
 
+#include "watchdog.h"
+
 #include "medusa/error.h"
 #include "medusa/io.h"
 #include "medusa/condition.h"
@@ -49,17 +51,16 @@ static const unsigned int g_polls[] = {
         MEDUSA_MONITOR_POLL_DEFAULT,
 #if defined(__LINUX__)
         MEDUSA_MONITOR_POLL_EPOLL,
+        MEDUSA_MONITOR_POLL_POLL,
 #endif
 #if defined(__APPLE__)
         MEDUSA_MONITOR_POLL_KQUEUE,
-#endif
-#if defined(__LINUX__) || defined(__APPLE__)
         MEDUSA_MONITOR_POLL_POLL,
 #endif
         MEDUSA_MONITOR_POLL_SELECT,
 #if defined(__WINDOWS__)
         MEDUSA_MONITOR_POLL_WSAPOLL,
-        MEDUSA_MONITOR_POLL_IOCP,
+        MEDUSA_MONITOR_POLL_IOCP
 #endif
 };
 
@@ -655,16 +656,6 @@ static int test_invalid (void)
         return 0;
 }
 
-#if !defined(__WINDOWS__)
-
-static void alarm_handler (int sig)
-{
-        (void) sig;
-        abort();
-}
-
-#endif
-
 int main (int argc, char *argv[])
 {
         int rc;
@@ -679,13 +670,6 @@ int main (int argc, char *argv[])
         (void) argc;
         (void) argv;
 
-#if defined(__WINDOWS__)
-        WSADATA wsaData;
-        WSAStartup(MAKEWORD(2,2), &wsaData);
-#else
-        signal(SIGALRM, alarm_handler);
-#endif
-
         failed = 0;
 #if defined(__LINUX__)
         before = count_fds();
@@ -696,9 +680,7 @@ int main (int argc, char *argv[])
         for (p = 0; p < sizeof(g_polls) / sizeof(g_polls[0]); p++) {
                 fprintf(stderr, "testing poll: %s\n", medusa_monitor_poll_type_string(g_polls[p]));
                 for (w = 0; w < sizeof(g_wakeups) / sizeof(g_wakeups[0]); w++) {
-#if !defined(__WINDOWS__)
-                        alarm(30);
-#endif
+                        watchdog_arm(30, NULL);
                         rc = test_wakeup(g_polls[p], g_wakeups[w]);
                         if (rc != 0) {
                                 fprintf(stderr, "  failed\n");

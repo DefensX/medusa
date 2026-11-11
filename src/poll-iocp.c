@@ -742,7 +742,9 @@ static int internal_slow_prepare (struct internal *internal)
         struct sock *sock;
         npfds = 0;
         TAILQ_FOREACH(sock, &internal->slows, list) {
-                npfds += 1;
+                if (sock->closed == 0) {
+                        npfds += 1;
+                }
         }
         if (npfds > internal->spfds) {
                 WSAPOLLFD *pfds;
@@ -761,6 +763,9 @@ static int internal_slow_prepare (struct internal *internal)
         }
         i = 0;
         TAILQ_FOREACH(sock, &internal->slows, list) {
+                if (sock->closed) {
+                        continue;
+                }
                 internal->pfds[i].fd      = sock->socket;
                 internal->pfds[i].events  = 0;
                 internal->pfds[i].revents = 0;
@@ -777,6 +782,33 @@ static int internal_slow_prepare (struct internal *internal)
                 i += 1;
         }
         return npfds;
+}
+
+/*
+ * WSAPoll fails as a whole when one of the sockets is closed under its io,
+ * find them one by one, report them once and leave them out from now on
+ */
+static int internal_slow_invalid (struct internal *internal, int npfds)
+{
+        int i;
+        int count;
+        WSAPOLLFD pfd;
+        struct sock *sock;
+        count = 0;
+        for (i = 0; i < npfds; i++) {
+                sock = internal->psocks[i];
+                if (sock->dead) {
+                        continue;
+                }
+                pfd = internal->pfds[i];
+                pfd.revents = 0;
+                if (WSAPoll(&pfd, 1, 0) == SOCKET_ERROR) {
+                        sock->closed = 1;
+                        dispatch_push(internal, sock, MEDUSA_IO_EVENT_NVAL);
+                        count += 1;
+                }
+        }
+        return count;
 }
 
 static void internal_slow_collect (struct internal *internal, int npfds)
@@ -807,6 +839,7 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
         int error;
         int npfds;
         int nready;
+        int werror;
         int block_slow;
         int ndispatched;
         BOOL brc;
@@ -849,9 +882,13 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
         internal_unlock(internal);
 
         error  = 0;
+        werror = 0;
         nready = 0;
         if (block_slow) {
                 nready = WSAPoll(internal->pfds, npfds, (INT) timeout);
+                if (nready == SOCKET_ERROR) {
+                        werror = WSAGetLastError();
+                }
                 timeout = 0;
         }
         count = 0;
@@ -865,15 +902,19 @@ static int internal_run (struct medusa_poll_backend *backend, struct timespec *t
         }
         if (!block_slow && npfds > 0) {
                 nready = WSAPoll(internal->pfds, npfds, 0);
-        }
-        if (nready == SOCKET_ERROR) {
-                medusa_errorf("WSAPoll failed, error: %d", WSAGetLastError());
-                error = -EIO;
+                if (nready == SOCKET_ERROR) {
+                        werror = WSAGetLastError();
+                }
         }
 
         internal_lock(internal);
         internal_complete(internal, count);
-        if (nready > 0) {
+        if (nready == SOCKET_ERROR) {
+                if (internal_slow_invalid(internal, npfds) == 0) {
+                        medusa_errorf("WSAPoll failed, error: %d", werror);
+                        error = -EIO;
+                }
+        } else if (nready > 0) {
                 internal_slow_collect(internal, npfds);
         }
         internal_unlock(internal);
