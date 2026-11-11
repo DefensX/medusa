@@ -329,7 +329,6 @@ static int monitor_signal_io_onevent (struct medusa_io *io, unsigned int events,
 static int monitor_signal_unlocked (struct medusa_monitor *monitor, unsigned int reason)
 {
         int rc;
-        medusa_errorf("monitor_signal: reason: %u", reason);
         if (reason == WAKEUP_REASON_LOOP_BREAK) {
                 monitor->running = 0;
         } else if (reason == WAKEUP_REASON_LOOP_CONTINUE) {
@@ -1784,7 +1783,6 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_run_timeout (struct 
         }
 
         if (monitor->wakeup.fired != 0) {
-                medusa_errorf("monitor_run_timeout: wakeup fired, setting timeout to 0");
                 timeout = 0;
                 monitor->wakeup.stall += 1;
         }
