@@ -1256,6 +1256,7 @@ __attribute__ ((visibility ("default"))) struct medusa_monitor * medusa_monitor_
                 pthread_mutex_init(&monitor->mutex, NULL);
         }
         monitor->running = 1;
+        monitor->wakeup.pending = 1;
         monitor->wakeup.fds[0] = -1;
         monitor->wakeup.fds[1] = -1;
         if (options->poll.type == MEDUSA_MONITOR_POLL_DEFAULT) {
