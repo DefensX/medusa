@@ -1787,7 +1787,6 @@ __attribute__ ((visibility ("default"))) int medusa_monitor_run_timeout (struct 
                 monitor->wakeup.stall += 1;
         }
         if (recreated) {
-                medusa_errorf("monitor_run_timeout: wakeup recreated");
                 timeout = 0;
         }
         if (timeout < 0) {
