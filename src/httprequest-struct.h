@@ -18,6 +18,7 @@ struct medusa_httprequest {
         double read_timeout;
         http_parser http_parser;
         http_parser_settings http_parser_settings;
+        int http_parser_header_field;
         struct medusa_httprequest_reply *reply;
         int onevent_error;
         void *userdata;
